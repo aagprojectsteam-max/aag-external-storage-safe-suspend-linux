@@ -69,6 +69,8 @@ internal storage, a continued user session, and zero orderly-poweroff requests.
 See [tested hardware](docs/TESTED-HARDWARE.md) and the normalized
 [acceptance record](docs/ACCEPTANCE.md). Those results validate that reference
 platform, not every enclosure, filesystem, desktop, kernel, or firmware.
+The public release's independent retrieval checks are recorded in
+[publication verification](docs/PUBLICATION-VERIFICATION.md).
 
 ## Install
 
