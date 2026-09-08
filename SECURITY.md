@@ -1,8 +1,9 @@
 # Security policy
 
-## Supported version
+## Supported versions
 
-Security and storage-safety fixes are provided for the latest release.
+Security and storage-safety fixes are provided for v1.1.x. Public v1.0.0 can be
+upgraded directly to v1.1.0 without uninstalling.
 
 ## Reporting a vulnerability
 
@@ -27,3 +28,6 @@ This software is defense in depth, not a substitute for current backups,
 filesystem checks, firmware updates, or hardware qualification. It cannot
 guarantee recovery from every kernel, firmware, controller, cable, or power
 failure. The default emergency policy never powers off the system.
+
+The updater's privilege and artifact trust boundaries are documented in the
+[updater threat model](docs/UPDATER-THREAT-MODEL.md).

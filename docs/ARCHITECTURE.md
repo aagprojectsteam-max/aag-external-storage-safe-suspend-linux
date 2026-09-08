@@ -77,3 +77,19 @@ Optional pre-suspend and post-resume argv hooks are serialized inside the
 transaction and must return success. They are an integration boundary, not a
 license to weaken the storage audit. Modem, GNSS, VM, and vendor-specific policy
 remain separate projects.
+
+## Installed state and upgrades
+
+The runtime architecture above remains `suspend-contract-v1`. Maintenance is a
+separate transaction around project-owned installation paths. Canonical
+root-only state records schemas, release identity, file ownership classes and
+hashes, selected configuration identity, migrations, pristine repair payload,
+and one compatible rollback pointer. The public v1.0.0 legacy state is accepted
+only after matching its published fixed file identities.
+
+An upgrade verifies active runtime and systemd jobs before mutation, holds a
+project flock throughout, snapshots exact prior files, applies declarative
+schema migrations, atomically replaces allowlisted files, reloads systemd and
+udev metadata, validates the merged graph and rule, and commits the new state
+last. Precommit failure reverses the mutation list. Repair and deliberate
+rollback use the same active-transaction guard and local transactional writer.

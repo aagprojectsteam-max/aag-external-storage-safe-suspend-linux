@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Build deterministic, self-verifying v1.0.0 release artifacts."""
+"""Build deterministic, self-verifying release artifacts and compatibility metadata."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 PROJECT = "aag-external-storage-safe-suspend-linux"
 EPOCH = 1788825600  # 2026-09-08T00:00:00Z
 EXCLUDES = {
@@ -88,8 +88,7 @@ set -eu
 PROJECT="{PROJECT}"
 PAYLOAD_SHA256="{payload_hash}"
 SELF="$0"
-test "$#" -gt 0 || {{ echo "Usage: $SELF install [options] | uninstall | verify-source" >&2; exit 2; }}
-WORK="$(mktemp -d "${{TMPDIR:-/tmp}}/${{PROJECT}}.XXXXXX")"
+WORK="$(mktemp -d "/var/tmp/${{PROJECT}}.XXXXXX")"
 trap 'rm -rf -- "$WORK"' EXIT HUP INT TERM
 LINE="$(awk '/^__AAG_PAYLOAD_BELOW__$/ {{ print NR + 1; exit }}' "$SELF")"
 test -n "$LINE" || {{ echo "Installer payload marker is missing" >&2; exit 1; }}
@@ -99,6 +98,10 @@ test "$ACTUAL" = "$PAYLOAD_SHA256" || {{ echo "Installer payload checksum mismat
 mkdir "$WORK/tree"
 tar -xzf "$WORK/payload.tar.gz" -C "$WORK/tree"
 (cd "$WORK/tree" && sha256sum -c PAYLOAD-SHA256SUMS >/dev/null)
+INSTALLER_SHA256="$(sha256sum "$SELF" | awk '{{print $1}}')"
+AAG_RELEASE_SOURCE="GITHUB_RELEASE_VERIFIED_PAYLOAD" \
+AAG_RELEASE_PAYLOAD_SHA256="$PAYLOAD_SHA256" \
+AAG_RELEASE_INSTALLER_SHA256="$INSTALLER_SHA256" \
 /usr/bin/python3 "$WORK/tree/scripts/install.py" "$@"
 exit 0
 __AAG_PAYLOAD_BELOW__
@@ -131,14 +134,28 @@ def build() -> dict[str, object]:
     checksums = "".join(f"{value}  {name}\n" for name, value in sorted(assets.items()))
     (dist / "SHA256SUMS").write_text(checksums)
     release_manifest = {
-        "project": PROJECT,
+        "product": PROJECT,
         "version": VERSION,
+        "release_date": "2026-09-08",
         "source_date_epoch": EPOCH,
+        "minimum_upgrader_schema": 1,
+        "upgrader_schema": 2,
+        "config_schema": 1,
+        "state_schema": 1,
+        "migration_schema": 1,
+        "systemd_wiring_revision": 1,
+        "udev_rule_revision": 1,
+        "supported_upgrade_from": [">=1.0.0,<1.2.0"],
+        "supported_downgrade_from": [],
+        "migration_ids": [
+            "bootstrap-public-v1.0.0-to-installed-state-v1",
+            "upgrader-schema-1-to-2",
+        ],
         "assets": assets,
         "public_file_count": len(file_hashes),
         "power_state_actions": "none",
     }
-    (dist / "RELEASE-MANIFEST.json").write_text(
+    (dist / "release-manifest.json").write_text(
         json.dumps(release_manifest, sort_keys=True, indent=2) + "\n"
     )
     return release_manifest
@@ -152,6 +169,7 @@ def validate_only() -> dict[str, object]:
         Path("SECURITY.md"),
         Path("CONTRIBUTING.md"),
         Path("scripts/install.py"),
+        Path("src/aag_safe_suspend/maintenance.py"),
         Path("systemd/aag-external-storage-safe-suspend.service"),
         Path("udev/99-aag-external-storage-safe-suspend.rules.in"),
     }

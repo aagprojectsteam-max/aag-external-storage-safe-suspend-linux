@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 from pathlib import Path
+import os
 import sys
 
-installed = Path("/usr/lib/aag-external-storage-safe-suspend")
+root = Path(os.environ.get("AAG_SAFE_SUSPEND_ROOT", "/"))
+installed = root / "usr/lib/aag-external-storage-safe-suspend"
 source = Path(__file__).resolve().parent
 sys.path.insert(0, str(installed if installed.is_dir() else source))
 

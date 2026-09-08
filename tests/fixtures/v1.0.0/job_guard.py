@@ -35,14 +35,7 @@ STORAGE_PATTERNS = (
     "backup",
     "snapshot",
 )
-PROJECT_PATTERNS = (
-    "aag-external-storage-safe-suspend",
-    "aag-storage-sleep",
-    "aag-sleep-recovery",
-    "aag-ugreen",
-    "aag-r1",
-    "aag-t700",
-)
+PROJECT_PATTERNS = ("aag-external-storage-safe-suspend",)
 ROUTINE_ALLOW = (
     re.compile(r"^(apt-daily|apt-daily-upgrade|apt-news|esm-cache|motd-news|man-db)\.service$"),
     re.compile(r"^(cups|cups-browsed|fwupd-refresh|sysstat-collect|logrotate)\.service$"),

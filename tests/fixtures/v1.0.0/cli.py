@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import __version__, coordinator, identity, maintenance
+from . import __version__, coordinator, identity
 from . import config as configuration
 from .job_guard import main as job_guard_main
 
@@ -22,11 +22,6 @@ def main() -> int:
     commands.add_parser("recover")
     commands.add_parser("validate")
     commands.add_parser("status")
-    commands.add_parser("health-check")
-    commands.add_parser("update-check")
-    commands.add_parser("repair")
-    commands.add_parser("rollback")
-    commands.add_parser("upgrade")
     render = commands.add_parser("render-udev")
     render.add_argument("--config", type=Path, required=True)
     probe = commands.add_parser("probe")
@@ -51,29 +46,8 @@ def main() -> int:
         print(json.dumps(coordinator.validate_installation(), sort_keys=True, indent=2))
         return 0
     if args.command == "status":
-        value = maintenance.inspect()
-        print(json.dumps(value, sort_keys=True, indent=2))
-        return maintenance.EXIT_STATUS[value["status"]]
-    if args.command == "health-check":
-        value, status = maintenance.health_check()
-        print(json.dumps(value, sort_keys=True, indent=2))
-        return status
-    if args.command == "update-check":
-        print(json.dumps(maintenance.update_check(), sort_keys=True, indent=2))
+        print(json.dumps(coordinator.status(), sort_keys=True, indent=2))
         return 0
-    if args.command == "repair":
-        print(json.dumps(maintenance.repair(), sort_keys=True, indent=2))
-        return 0
-    if args.command == "rollback":
-        print(json.dumps(maintenance.rollback(), sort_keys=True, indent=2))
-        return 0
-    if args.command == "upgrade":
-        print(
-            "UPGRADE_MODE=MANUAL_VERIFIED_INSTALLER\n"
-            "Download the target .run asset and SHA256SUMS, verify with sha256sum, "
-            "then run the asset as root."
-        )
-        return 2
     if args.command == "render-udev":
         value = configuration.load(args.config)
         print(identity.udev_rule(value, coordinator.MARKER_PATH), end="")

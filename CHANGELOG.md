@@ -3,6 +3,14 @@
 All notable changes are documented here. This project follows Semantic
 Versioning.
 
+## 1.1.0 — 2026-09-08
+
+- Add canonical installed state and exact public-v1.0.0 bootstrap.
+- Add transactional in-place upgrades, repair, bounded rollback, maintenance
+  locking, health/status classification, and opt-in update checks.
+- Add release compatibility metadata, threat model, upgrade matrix, and gated
+  release publication.
+
 ## 1.0.0 — 2026-09-08
 
 - First public release.

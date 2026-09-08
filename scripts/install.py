@@ -4,10 +4,12 @@ from __future__ import annotations
 import argparse
 import contextlib
 import datetime as dt
+import fcntl
 import hashlib
 import json
 import os
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -19,18 +21,51 @@ from typing import Any
 SOURCE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SOURCE / "src"))
 
-from aag_safe_suspend import __version__, identity, job_guard
+from aag_safe_suspend import __version__, identity, job_guard, maintenance, migrations
 from aag_safe_suspend import config as configuration
 
 PROJECT = "aag-external-storage-safe-suspend"
 STATE_ROOT = Path("/var/lib") / PROJECT
+INSTALL_STATE = STATE_ROOT / "install-state.json"
+LEGACY_STATE = STATE_ROOT / "active.json"
 CONFIG_PATH = Path("/etc") / PROJECT / "config.json"
 RULE_PATH = Path("/etc/udev/rules.d/99-aag-external-storage-safe-suspend.rules")
 MARKER_PATH = "/run/aag-external-storage-safe-suspend/automount-suppressed.json"
 TIMESHIFT_REAL = Path("/usr/lib") / PROJECT / "timeshift.real"
 TIMESHIFT_GTK_REAL = Path("/usr/lib") / PROJECT / "timeshift-gtk.real"
+PRODUCT_ID = "aag-external-storage-safe-suspend-linux"
+UPGRADER_SCHEMA = 2
+STATE_SCHEMA = 1
+CONFIG_SCHEMA = 1
+MIGRATION_SCHEMA = 1
+MAX_ROLLBACK_GENERATIONS = 3
+
+# Fixed identities from the public v1.0.0 tag.  Configuration and the generated
+# rule are intentionally excluded: they are verified semantically below.
+LEGACY_V1_STATIC_HASHES = {
+    "/etc/systemd/system/aag-external-storage-safe-suspend-failure.service": "fa2d6e434a43a5aa7fb65bdab11a6452b9d4bb7f2027535d1b159be4079a41a0",
+    "/etc/systemd/system/aag-external-storage-safe-suspend-resume.service": "015372cf28790a14e7ebb2859d95dd3b9df92b5167be901e75d01820079d2332",
+    "/etc/systemd/system/aag-external-storage-safe-suspend.service": "2bedf22a46231b8e4abc6ce743aba7066c91c71cb6acb968ec1c966990112cf5",
+    "/etc/systemd/system/systemd-suspend.service.d/70-aag-external-storage-safe-suspend.conf": "af9687f0438022601aecd4054f65d36cb86df9a66f682eba218f187eb1e5afa9",
+    "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/__init__.py": "ce1d9c243973eda04be01b3db6cb9439a9080304d6201a25f9cd24976b48ac62",
+    "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/audit.py": "176ca1c5e56cac31562a0a8ff462d0cba5f7c9abf0f327074ffe64ec9e210a8a",
+    "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/cli.py": "d06d6a3500701a14be73bbba4b917763cda631f7dd8ee6c84cff6ae0648d9804",
+    "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/config.py": "158f627a9c268d47491fc4ab8c2e92272d0f777c165d2ca8d5b013e6f866939e",
+    "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/coordinator.py": "2c5035f2aa9197dc40db7f0951418ba3ac647fd925a1168a1c7f0f70b081c3ff",
+    "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/identity.py": "95d1d9ebbd13e80c1cf9c26651a58b3996994ac89ef131fffd34ba79a55832e7",
+    "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/job_guard.py": "bd238f0900358549c406a5b8bb01b9876b9597fa42f465d94d98c669318a831f",
+    "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/state.py": "ecfd36ec08c21647ee774e9cd612f8f45c45d77261bb8884f32f3a23f41e352e",
+    "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/thermal.py": "6d64a2a6cb3b81902ce28105f85389cd33aa21ab3878a0f69b929489b2fe4787",
+    "/usr/local/libexec/aag-safe-suspend": "aa6ee2153aa555cac434e2e6eb9829ebe545e95047ffb6ca8507f1f734fac0b6",
+    "/usr/local/libexec/aag-systemd-job-guard": "88a2410e00becdddd8785fd511e7bdd567a035292c32b519b1ac7fe47a531057",
+}
+LEGACY_V1_TIMESHIFT_HASHES = {
+    "/usr/bin/timeshift": "9e0763f0332ca486a6aeba77b14318d5b85a67937eedccc4fa2605ad78347a59",
+    "/usr/bin/timeshift-gtk": "c7b6811bbadd402baf7d66145db6b56b12bda17cc9f5b42219bb1db2a678f52a",
+}
 
 FILES = {
+    Path("/usr/local/bin/aag-safe-suspend"): (SOURCE / "src/aag-safe-suspend", 0o755),
     Path("/usr/local/libexec/aag-safe-suspend"): (SOURCE / "src/aag-safe-suspend", 0o755),
     Path("/usr/local/libexec/aag-systemd-job-guard"): (SOURCE / "src/aag-systemd-job-guard", 0o755),
     Path("/etc/systemd/system/aag-external-storage-safe-suspend.service"): (
@@ -99,9 +134,13 @@ class Installer:
         self.guard_dir: Path | None = None
         self.guard_stop: Path | None = None
         self.timeshift_diversion_added = False
+        self.installation_mode = "UNKNOWN"
+        self.previous_version: str | None = None
+        self.rollback_generation: Path | None = None
+        self.lock_stream: Any | None = None
 
     def target(self, path: Path) -> Path:
-        if not path.is_absolute():
+        if not path.is_absolute() or ".." in path.parts or "\x00" in str(path):
             raise InstallError(f"target is not absolute: {path}")
         return path if self.root == Path("/") else self.root / path.relative_to("/")
 
@@ -132,7 +171,7 @@ class Installer:
         if self.root == Path("/"):
             os_release = Path("/etc/os-release").read_text()
             if "ID=ubuntu" not in os_release and "ID_LIKE=ubuntu" not in os_release:
-                raise InstallError("v1.0.0 supports Ubuntu-family systemd desktops only")
+                raise InstallError("this release supports Ubuntu-family systemd desktops only")
             for executable in (
                 "/usr/bin/python3",
                 "/usr/bin/lsblk",
@@ -169,6 +208,9 @@ class Installer:
                 raise InstallError(f"runtime transaction state is unreadable: {exc}") from exc
             if runtime_state != "IDLE":
                 raise InstallError(f"runtime transaction is not IDLE: {runtime_state}")
+        jobs = runtime / "jobs"
+        if jobs.is_dir() and any(jobs.glob("*.json")):
+            raise InstallError("active protected backup lifecycle is registered")
 
     def new_transaction(self, operation: str) -> Path:
         stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
@@ -246,25 +288,155 @@ class Installer:
         if self.guard.returncode != 0 or (self.guard_dir / "VIOLATION.json").exists():
             raise InstallError("systemd job guard did not close cleanly")
 
-    def load_active(self) -> dict[str, Any] | None:
-        path = self.target(STATE_ROOT) / "active.json"
-        if not path.exists() and not path.is_symlink():
-            return None
+    def _load_manifest_path(self, path: Path, *, legacy: bool) -> dict[str, Any]:
         info = path.lstat()
         if not stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode):
-            raise InstallError("active installation manifest is not a regular file")
+            raise InstallError("installation manifest is not a regular file")
         expected_uid = os.getuid() if self.test_mode else 0
         if info.st_uid != expected_uid or stat.S_IMODE(info.st_mode) != 0o600:
-            raise InstallError("active installation manifest owner or mode is unsafe")
+            raise InstallError("installation manifest owner or mode is unsafe")
         try:
             value = json.loads(path.read_text())
         except (OSError, TypeError, ValueError) as exc:
-            raise InstallError(f"active installation manifest is unreadable: {exc}") from exc
-        if value.get("project") != PROJECT:
-            raise InstallError("active installation manifest is not project-owned")
+            raise InstallError(f"installation manifest is unreadable: {exc}") from exc
+        expected = PROJECT if legacy else PRODUCT_ID
+        identity_key = "project" if legacy else "product_id"
+        if value.get(identity_key) != expected:
+            raise InstallError("installation manifest is not project-owned")
         return value
 
-    def verify_existing(self, active: dict[str, Any] | None, paths: list[Path]) -> None:
+    def load_active(self) -> dict[str, Any] | None:
+        managed_path = self.target(INSTALL_STATE)
+        legacy_path = self.target(LEGACY_STATE)
+        if managed_path.exists() or managed_path.is_symlink():
+            active = self._load_manifest_path(managed_path, legacy=False)
+            if active.get("state_schema") != STATE_SCHEMA:
+                raise InstallError("installed-state schema is unsupported")
+            if active.get("operation", "COMMITTED") != "COMMITTED":
+                raise InstallError(
+                    f"partial previous operation requires recovery: {active.get('operation')}"
+                )
+            allowed = {
+                *(str(path) for path in FILES),
+                str(CONFIG_PATH),
+                str(RULE_PATH),
+                "/usr/bin/timeshift",
+                "/usr/bin/timeshift-gtk",
+            }
+            recorded = active.get("files")
+            if not isinstance(recorded, dict) or not set(recorded).issubset(allowed):
+                raise InstallError("installed-state contains an unrecognized owned path")
+            return active
+        if legacy_path.exists() or legacy_path.is_symlink():
+            return self.bootstrap_legacy(self._load_manifest_path(legacy_path, legacy=True))
+        probes = [self.target(path) for path in [*FILES, CONFIG_PATH, RULE_PATH]]
+        if any(path.exists() or path.is_symlink() for path in probes):
+            raise InstallError("PARTIAL_INSTALLATION: managed state is missing")
+        return None
+
+    def bootstrap_legacy(self, legacy: dict[str, Any]) -> dict[str, Any]:
+        if legacy.get("version") != "1.0.0" or not isinstance(legacy.get("files"), dict):
+            raise InstallError("UNSUPPORTED_MIGRATION: legacy state is not public v1.0.0")
+        recorded = legacy["files"]
+        required = dict(LEGACY_V1_STATIC_HASHES)
+        if legacy.get("timeshift_integration"):
+            required.update(LEGACY_V1_TIMESHIFT_HASHES)
+        for logical, expected_hash in required.items():
+            metadata = recorded.get(logical)
+            path = self.target(Path(logical))
+            if (
+                not isinstance(metadata, dict)
+                or metadata.get("sha256") != expected_hash
+                or not path.is_file()
+                or path.is_symlink()
+                or sha256(path) != expected_hash
+            ):
+                raise InstallError(f"UNSUPPORTED_MIGRATION: v1.0.0 identity mismatch: {logical}")
+        selected = configuration.load(self.target(CONFIG_PATH))
+        rule_meta = recorded.get(str(RULE_PATH), {})
+        rule_path = self.target(RULE_PATH)
+        if (
+            not rule_path.is_file()
+            or rule_path.is_symlink()
+            or sha256(rule_path) != rule_meta.get("sha256")
+        ):
+            raise InstallError("UNSUPPORTED_MIGRATION: legacy udev rule identity mismatch")
+        files: dict[str, Any] = {}
+        for logical, metadata in recorded.items():
+            classification = (
+                "SUPPORTED_USER_CONFIG" if logical == str(CONFIG_PATH) else "PROJECT_MANAGED"
+            )
+            files[logical] = {**metadata, "classification": classification}
+        self.installation_mode = "LEGACY_BOOTSTRAP_UPGRADE"
+        return {
+            "product_id": PRODUCT_ID,
+            "installed_version": "1.0.0",
+            "installed_at": legacy.get("installed"),
+            "upgrader_schema": 1,
+            "state_schema": STATE_SCHEMA,
+            "configuration_schema": CONFIG_SCHEMA,
+            "migration_schema": 0,
+            "operation": "COMMITTED",
+            "release": {"tag": "v1.0.0", "source": "PUBLIC_LEGACY_BOOTSTRAP"},
+            "files": files,
+            "timeshift_integration": bool(legacy.get("timeshift_integration")),
+            "selected_device": selected["device"],
+            "selected_configuration_sha256": sha256(self.target(CONFIG_PATH)),
+            "rollback": {"available": False},
+            "legacy_state": str(LEGACY_STATE),
+        }
+
+    @staticmethod
+    def version_tuple(value: str) -> tuple[int, int, int]:
+        parts = value.split("-", 1)[0].split(".")
+        if len(parts) != 3 or not all(part.isdigit() for part in parts):
+            raise InstallError(f"invalid installed version: {value}")
+        return tuple(int(part) for part in parts)  # type: ignore[return-value]
+
+    def classify_install(self, active: dict[str, Any] | None, repair: bool) -> str:
+        if not active:
+            return "FRESH_INSTALL"
+        current = str(active.get("installed_version") or active.get("version"))
+        self.previous_version = current
+        installed = self.version_tuple(current)
+        target_version = self.version_tuple(__version__)
+        if installed == target_version:
+            return "SAME_VERSION_REPAIR" if repair else "SAME_VERSION"
+        if installed > target_version:
+            raise InstallError(
+                f"DOWNGRADE_REFUSED_WITH_REASON: {current} -> {__version__} is not declared compatible"
+            )
+        if installed < (1, 0, 0):
+            raise InstallError(f"UNSUPPORTED_MIGRATION: {current} -> {__version__}")
+        return "UPGRADE"
+
+    @contextlib.contextmanager
+    def project_lock(self):
+        directory = self.target(STATE_ROOT)
+        self.ensure_directory(directory, 0o700)
+        path = self.target(STATE_ROOT / "installer.lock")
+        self.lock_stream = path.open("a+")
+        os.chmod(path, 0o600)
+        try:
+            fcntl.flock(self.lock_stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            self.lock_stream.close()
+            raise InstallError("another install, rollback, repair, or uninstall is active") from exc
+        self.lock_stream.seek(0)
+        self.lock_stream.truncate()
+        self.lock_stream.write(json.dumps({"pid": os.getpid(), "version": __version__}) + "\n")
+        self.lock_stream.flush()
+        os.fsync(self.lock_stream.fileno())
+        try:
+            yield
+        finally:
+            fcntl.flock(self.lock_stream, fcntl.LOCK_UN)
+            self.lock_stream.close()
+            self.lock_stream = None
+
+    def verify_existing(
+        self, active: dict[str, Any] | None, paths: list[Path], *, repair: bool = False
+    ) -> None:
         known = (active or {}).get("files", {})
         for logical in paths:
             target = self.target(logical)
@@ -275,16 +447,23 @@ class Installer:
                 raise InstallError(f"refusing to overwrite non-project path: {logical}")
             info = target.lstat()
             expected_uid = os.getuid() if self.test_mode else 0
-            if (
+            mismatch = (
                 not stat.S_ISREG(info.st_mode)
                 or stat.S_ISLNK(info.st_mode)
                 or info.st_uid != expected_uid
                 or stat.S_IMODE(info.st_mode) != expected["mode"]
                 or sha256(target) != expected["sha256"]
-            ):
-                raise InstallError(
-                    f"installed project file changed outside the installer: {logical}"
-                )
+            )
+            if mismatch and expected.get("classification") == "SUPPORTED_USER_CONFIG":
+                try:
+                    configuration.load(target)
+                    continue
+                except Exception as exc:
+                    raise InstallError(f"supported configuration is invalid: {exc}") from exc
+            if mismatch and repair and expected.get("classification") == "PROJECT_MANAGED":
+                continue
+            if mismatch:
+                raise InstallError(f"UNKNOWN_LOCAL_MODIFICATION: {logical}")
 
     def backup(self, logical: Path) -> None:
         assert self.transaction is not None
@@ -305,6 +484,100 @@ class Installer:
             }
         else:
             self.baseline[key] = {"existed": False}
+
+    def create_rollback_snapshot(self, active: dict[str, Any] | None) -> dict[str, Any]:
+        if not active:
+            return {"available": False, "reason": "fresh installation"}
+        assert self.transaction is not None
+        stamp = self.transaction.name.split("-", 1)[0]
+        current_version = str(active["installed_version"])
+        generation = self.target(STATE_ROOT) / "rollbacks" / f"{stamp}-v{current_version}"
+        self.ensure_directory(generation.parent, 0o700)
+        generation.mkdir(mode=0o700, exist_ok=False)
+        snapshot_state = json.loads(json.dumps(active))
+        for logical, metadata in snapshot_state["files"].items():
+            source = self.target(Path(logical))
+            if not source.is_file() or source.is_symlink():
+                raise InstallError(f"cannot snapshot unsafe installed file: {logical}")
+            destination = generation / "root" / Path(logical).relative_to("/")
+            destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+            metadata["sha256"] = sha256(source)
+            metadata["mode"] = source.stat().st_mode & 0o777
+        state_path = generation / "install-state.json"
+        state_path.write_text(json.dumps(snapshot_state, sort_keys=True, indent=2) + "\n")
+        os.chmod(state_path, 0o600)
+        rollback_compatible = True
+        rollback_reason = "schema-compatible exact snapshot"
+        try:
+            snapshot_config = configuration.load(self.target(CONFIG_PATH))
+            if self.target(RULE_PATH).read_text() != identity.udev_rule(
+                snapshot_config, MARKER_PATH
+            ):
+                rollback_compatible = False
+                rollback_reason = "prior generated rule did not match locally changed configuration"
+        except Exception:
+            rollback_compatible = False
+            rollback_reason = "prior configuration was not rollback-health-compatible"
+        record = {
+            "from_version": __version__,
+            "to_version": current_version,
+            "configuration_schema": snapshot_state.get("configuration_schema", CONFIG_SCHEMA),
+            "state_schema": snapshot_state.get("state_schema", STATE_SCHEMA),
+            "migration_schema": snapshot_state.get("migration_schema", 0),
+            "compatible": rollback_compatible,
+            "reason": rollback_reason,
+        }
+        record_path = generation / "rollback.json"
+        record_path.write_text(json.dumps(record, sort_keys=True, indent=2) + "\n")
+        os.chmod(record_path, 0o600)
+        self.rollback_generation = generation
+        logical_generation = (
+            generation if self.root == Path("/") else Path("/") / generation.relative_to(self.root)
+        )
+        return {
+            "available": True,
+            "compatible": rollback_compatible,
+            "version": current_version,
+            "path": str(logical_generation),
+            "reason": rollback_reason,
+        }
+
+    def create_payload_cache(self, manifest_files: dict[str, Any]) -> str:
+        assert self.transaction is not None
+        cache = self.target(STATE_ROOT) / "payloads" / f"v{__version__}-{self.transaction.name}"
+        self.ensure_directory(cache.parent, 0o700)
+        cache.mkdir(mode=0o700, exist_ok=False)
+        for logical, metadata in manifest_files.items():
+            if metadata.get("classification") != "PROJECT_MANAGED":
+                continue
+            source = self.target(Path(logical))
+            destination = cache / "root" / Path(logical).relative_to("/")
+            destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+            if sha256(destination) != metadata["sha256"]:
+                raise InstallError(f"payload cache verification failed: {logical}")
+        logical_cache = (
+            cache if self.root == Path("/") else Path("/") / cache.relative_to(self.root)
+        )
+        return str(logical_cache / "root")
+
+    def prune_generations(self, keep_payload: str) -> None:
+        for parent, keep in (
+            (self.target(STATE_ROOT) / "rollbacks", MAX_ROLLBACK_GENERATIONS),
+            (self.target(STATE_ROOT) / "payloads", MAX_ROLLBACK_GENERATIONS + 1),
+        ):
+            if not parent.is_dir() or parent.is_symlink():
+                continue
+            entries = sorted(
+                (path for path in parent.iterdir() if path.is_dir() and not path.is_symlink()),
+                key=lambda path: path.name,
+                reverse=True,
+            )
+            for old in entries[keep:]:
+                if str(old) in keep_payload:
+                    continue
+                shutil.rmtree(old)
 
     def install_bytes(self, logical: Path, content: bytes, mode: int) -> None:
         self.backup(logical)
@@ -495,6 +768,13 @@ class Installer:
     def install(self, args: argparse.Namespace) -> dict[str, Any]:
         self.ensure_environment()
         active = self.load_active()
+        repair_requested = bool(getattr(args, "repair", False))
+        operation = self.classify_install(active, repair_requested)
+        self.installation_mode = (
+            self.installation_mode
+            if self.installation_mode == "LEGACY_BOOTSTRAP_UPGRADE"
+            else operation
+        )
         config_path = self.target(CONFIG_PATH)
         if args.config:
             selected_config = configuration.load(Path(args.config))
@@ -531,23 +811,55 @@ class Installer:
                 )
             )
 
+        if operation == "SAME_VERSION":
+            result = maintenance.inspect(self.root, system_checks=False)
+            return {
+                "result": "SAME_VERSION",
+                "version": __version__,
+                "health": result["status"],
+                "hint": "use --repair to restore project-managed files",
+            }
+
         rule = identity.udev_rule(selected_config, MARKER_PATH).encode()
         paths = list(FILES) + [CONFIG_PATH, RULE_PATH]
         timeshift_requested = bool(
             args.timeshift or (active and active.get("timeshift_integration"))
         )
-        self.verify_existing(active, paths)
+        self.verify_existing(active, paths, repair=repair_requested)
         if active and active.get("timeshift_integration"):
             self.verify_existing(
-                active, [Path("/usr/bin/timeshift"), Path("/usr/bin/timeshift-gtk")]
+                active,
+                [Path("/usr/bin/timeshift"), Path("/usr/bin/timeshift-gtk")],
+                repair=repair_requested,
             )
-        transaction = self.new_transaction("install")
+        transaction = self.new_transaction(operation.lower().replace("_", "-"))
         self.start_guard()
         try:
             self.guard_clear("pre-mutation")
+            migration_plan = migrations.plan(
+                active,
+                legacy_bootstrap=self.installation_mode == "LEGACY_BOOTSTRAP_UPGRADE",
+            )
+            if active:
+                migrations.apply(active, migration_plan)
+            rollback = (
+                active.get("rollback", {"available": False})
+                if operation == "SAME_VERSION_REPAIR" and active
+                else self.create_rollback_snapshot(active)
+            )
+            if active and self.target(INSTALL_STATE).exists():
+                pending = json.loads(json.dumps(active))
+                pending["operation"] = "UPGRADE_PENDING"
+                pending["pending_target_version"] = __version__
+                self.install_bytes(
+                    INSTALL_STATE,
+                    (json.dumps(pending, sort_keys=True, indent=2) + "\n").encode(),
+                    0o600,
+                )
             for logical, (source, mode) in FILES.items():
                 self.install_file(logical, source, mode)
-            self.install_bytes(CONFIG_PATH, configuration.dump(selected_config).encode(), 0o600)
+            if not active or args.config or args.device:
+                self.install_bytes(CONFIG_PATH, configuration.dump(selected_config).encode(), 0o600)
             self.install_bytes(RULE_PATH, rule, 0o644)
             timeshift = timeshift_requested
             if timeshift:
@@ -562,34 +874,96 @@ class Installer:
                     manifest_files[str(logical)] = {
                         "sha256": sha256(target),
                         "mode": target.stat().st_mode & 0o777,
+                        "classification": (
+                            "SUPPORTED_USER_CONFIG" if logical == CONFIG_PATH else "PROJECT_MANAGED"
+                        ),
                     }
+            payload_cache = self.create_payload_cache(manifest_files)
+            now = dt.datetime.now(dt.timezone.utc).isoformat()
+            migration_ids = [item.migration_id for item in migration_plan]
             manifest = {
-                "project": PROJECT,
-                "version": __version__,
-                "installed": dt.datetime.now(dt.timezone.utc).isoformat(),
-                "transaction": str(transaction),
+                "product_id": PRODUCT_ID,
+                "installed_version": __version__,
+                "installed_at": active.get("installed_at", now) if active else now,
+                "version_installed_at": now,
+                "upgrader_schema": UPGRADER_SCHEMA,
+                "state_schema": STATE_SCHEMA,
+                "configuration_schema": CONFIG_SCHEMA,
+                "migration_schema": MIGRATION_SCHEMA,
+                "systemd_wiring_revision": 1,
+                "udev_rule_revision": 1,
+                "operation": "COMMITTED",
+                "release": {
+                    "tag": f"v{__version__}",
+                    "source": os.environ.get("AAG_RELEASE_SOURCE", "LOCAL_VERIFIED_PAYLOAD"),
+                    "payload_sha256": os.environ.get("AAG_RELEASE_PAYLOAD_SHA256", "development"),
+                    "installer_sha256": os.environ.get(
+                        "AAG_RELEASE_INSTALLER_SHA256", "development"
+                    ),
+                },
+                "transaction": str(
+                    transaction
+                    if self.root == Path("/")
+                    else Path("/") / transaction.relative_to(self.root)
+                ),
                 "files": manifest_files,
                 "timeshift_integration": timeshift,
-                "baseline": self.baseline,
+                "selected_device": selected_config["device"],
+                "selected_configuration_sha256": sha256(self.target(CONFIG_PATH)),
+                "migrations_applied": migration_ids,
+                "payload_cache": payload_cache,
+                "rollback": rollback,
+                "compatibility": {
+                    "upgrade_from": ">=1.0.0,<1.2.0",
+                    "downgrade": "explicit-compatible-snapshot-only",
+                    "runtime_architecture": "suspend-contract-v1",
+                },
+                "backup_metadata": {
+                    "rollback_generations_maximum": MAX_ROLLBACK_GENERATIONS,
+                    "transaction_snapshot": str(transaction),
+                },
             }
             self.validate_installed(selected_config, manifest_files)
             self.install_bytes(
-                STATE_ROOT / "active.json",
+                INSTALL_STATE,
                 (json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode(),
                 0o600,
             )
+            legacy_path = self.target(LEGACY_STATE)
+            if legacy_path.exists() and not legacy_path.is_symlink():
+                self.backup(LEGACY_STATE)
+                legacy_path.unlink()
+                self.mutated.append(LEGACY_STATE)
             self.guard_clear("post-publication-marker")
             self.stop_guard()
             (transaction / "INSTALL-COMPLETE.json").write_text(
-                json.dumps({"version": __version__, "files": len(manifest_files)}, sort_keys=True)
+                json.dumps(
+                    {
+                        "version": __version__,
+                        "files": len(manifest_files),
+                        "operation": self.installation_mode,
+                        "migrations": migration_ids,
+                    },
+                    sort_keys=True,
+                )
                 + "\n"
             )
+            self.prune_generations(payload_cache)
             return manifest
-        except Exception:
-            self.rollback_mutation()
+        except Exception as original:
+            rollback_error: Exception | None = None
+            try:
+                self.rollback_mutation()
+            except Exception as exc:
+                rollback_error = exc
             with contextlib.suppress(Exception):
                 self.stop_guard()
-            (transaction / "INSTALL-ABORTED.txt").write_text("rollback attempted\n")
+            if rollback_error:
+                (transaction / "ROLLBACK-FAILED.txt").write_text(str(rollback_error) + "\n")
+                raise InstallError(
+                    f"upgrade failed ({original}); automatic rollback also failed ({rollback_error})"
+                ) from rollback_error
+            (transaction / "INSTALL-ABORTED.txt").write_text("automatic rollback complete\n")
             raise
 
     def remove_empty_project_directories(self) -> None:
@@ -620,7 +994,7 @@ class Installer:
         timeshift_removed = False
         try:
             self.guard_clear("pre-uninstall")
-            active_logical = STATE_ROOT / "active.json"
+            active_logical = INSTALL_STATE if self.target(INSTALL_STATE).exists() else LEGACY_STATE
             for logical in [*paths, active_logical]:
                 self.backup(logical)
             if active.get("timeshift_integration"):
@@ -637,7 +1011,7 @@ class Installer:
                     target.unlink()
                 self.mutated.append(logical)
             self.system_reload()
-            active_path = self.target(STATE_ROOT) / "active.json"
+            active_path = self.target(active_logical)
             with contextlib.suppress(FileNotFoundError):
                 active_path.unlink()
             self.mutated.append(active_logical)
@@ -701,6 +1075,11 @@ def parser() -> argparse.ArgumentParser:
     install.add_argument("--config", help="pre-reviewed configuration JSON")
     install.add_argument("--protect-mount", action="append", default=[])
     install.add_argument("--timeshift", action="store_true")
+    install.add_argument(
+        "--repair",
+        action="store_true",
+        help="repair the same version's project-managed files transactionally",
+    )
     commands.add_parser("uninstall")
     commands.add_parser("verify-source")
     return result
@@ -719,13 +1098,26 @@ def verify_source() -> dict[str, Any]:
 
 def main() -> int:
     os.umask(0o077)
-    args = parser().parse_args()
+
+    def terminated(_signum: int, _frame: Any) -> None:
+        raise InstallError("installer interrupted by termination signal")
+
+    signal.signal(signal.SIGTERM, terminated)
+    signal.signal(signal.SIGHUP, terminated)
+    argv = sys.argv[1:]
+    if not argv:
+        argv = ["install"]
+    elif argv == ["--repair"]:
+        argv = ["install", "--repair"]
+    args = parser().parse_args(argv)
     if args.command == "verify-source":
         print(json.dumps(verify_source(), sort_keys=True, indent=2))
         return 0
     installer = Installer(args.root.resolve(), bool(args.test_mode))
     try:
-        value = installer.install(args) if args.command == "install" else installer.uninstall()
+        installer.ensure_environment()
+        with installer.project_lock():
+            value = installer.install(args) if args.command == "install" else installer.uninstall()
     except Exception as exc:
         print(f"INSTALLER_REFUSED: {exc}", file=sys.stderr)
         if installer.transaction:

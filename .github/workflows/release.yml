@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install ruff==0.16.6
+      - run: ruff check . && ruff format --check .
+      - run: make release-acceptance
+      - run: python3 scripts/validate_release.py --tag "$GITHUB_REF_NAME"
+      - name: Publish verified assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          dist/aag-external-storage-safe-suspend-linux-v1.1.0.run
+          dist/aag-external-storage-safe-suspend-linux-v1.1.0.tar.gz
+          dist/SHA256SUMS
+          dist/release-manifest.json
+          --title "External Storage Safe Suspend v1.1.0"
+          --notes-file docs/RELEASE-NOTES-v1.1.0.md

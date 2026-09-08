@@ -14,7 +14,8 @@ build: release-check
 	$(PYTHON) scripts/build_release.py
 
 release-acceptance: build
-	$(PYTHON) scripts/release_acceptance.py dist/aag-external-storage-safe-suspend-linux-v1.0.0.run
+	$(PYTHON) scripts/validate_release.py
+	$(PYTHON) scripts/release_acceptance.py dist/aag-external-storage-safe-suspend-linux-v1.1.0.run
 
 clean:
 	rm -rf build dist release-work

@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+VERSION = "1.1.0"
 
 
 def sha256(path: Path) -> str:
@@ -62,6 +64,37 @@ def main() -> int:
             raise RuntimeError("release installer did not attest to no power action")
         if not (root / "usr/local/libexec/aag-safe-suspend").is_file():
             raise RuntimeError("release asset did not install its coordinator")
+        state = root / "var/lib/aag-external-storage-safe-suspend/install-state.json"
+        if not state.is_file() or f'"installed_version": "{VERSION}"' not in state.read_text():
+            raise RuntimeError("release asset did not commit canonical installed state")
+        cli_env = {
+            **os.environ,
+            "AAG_SAFE_SUSPEND_ROOT": str(root),
+            "AAG_SAFE_SUSPEND_TEST_MODE": "1",
+        }
+        version = subprocess.run(
+            [str(root / "usr/local/bin/aag-safe-suspend"), "--version"],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=30,
+            env=cli_env,
+        )
+        if version.returncode or version.stdout.strip() != VERSION:
+            raise RuntimeError("stable installed version command failed")
+        status = subprocess.run(
+            [str(root / "usr/local/bin/aag-safe-suspend"), "status"],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=30,
+            env=cli_env,
+        )
+        if status.returncode or '"status": "HEALTHY"' not in status.stdout:
+            raise RuntimeError("stable installed status command failed")
+        same = run(common + ["install"])
+        if '"result": "SAME_VERSION"' not in same.stdout:
+            raise RuntimeError("release installer did not detect a same-version invocation")
         run(common + ["uninstall"])
         if sha256(root / "usr/bin/timeshift") != original:
             raise RuntimeError("release asset did not restore the Timeshift fixture")
