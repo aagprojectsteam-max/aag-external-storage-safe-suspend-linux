@@ -9,8 +9,8 @@ run it directly. An existing supported installation is detected automatically;
 
 ```bash
 sha256sum --ignore-missing -c SHA256SUMS
-chmod +x aag-external-storage-safe-suspend-linux-v1.1.0.run
-sudo ./aag-external-storage-safe-suspend-linux-v1.1.0.run
+chmod +x aag-external-storage-safe-suspend-linux-v1.1.1.run
+sudo ./aag-external-storage-safe-suspend-linux-v1.1.1.run
 ```
 
 The installer reports `FRESH_INSTALL`, `SAME_VERSION`, `UPGRADE`, or a precise
@@ -88,14 +88,14 @@ sudo aag-safe-suspend rollback
 Rollback is allowed only when the installed state names a hash-verified,
 schema-compatible exact previous snapshot. It is itself transactional and runs
 the same active-transaction guard. There is no arbitrary version selection.
-Running an older installer is a downgrade, never an upgrade, and v1.1.0 refuses
+Running an older installer is a downgrade, never an upgrade, and v1.1.x refuses
 it with `DOWNGRADE_REFUSED_WITH_REASON`. A future release may declare a narrow
 supported downgrade only when config, state, wiring, and rollback migrations
 are explicitly reversible.
 
 ## First upgrade from public v1.0.0
 
-v1.1.0 contains the bootstrap identities of the public v1.0.0 tag. It requires
+v1.1.x contains the bootstrap identities of the public v1.0.0 tag. It requires
 the root-only v1.0.0 `active.json`, matches every fixed runtime, wrapper, unit,
 and drop-in against those known hashes, validates the existing configuration,
 and matches the generated rule to the v1.0.0 recorded baseline. It then creates

@@ -141,7 +141,7 @@ class UpgradeTests(unittest.TestCase):
             self.logical("/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/cli.py")
         )
         result = INSTALLER.Installer(self.root, True).install(self.args)
-        self.assertEqual(result["installed_version"], "1.1.0")
+        self.assertEqual(result["installed_version"], "1.1.1")
         self.assertIn("bootstrap-public-v1.0.0-to-installed-state-v1", result["migrations_applied"])
         self.assertFalse(self.logical(INSTALLER.LEGACY_STATE).exists())
         with self.environment():
@@ -248,7 +248,7 @@ class UpgradeTests(unittest.TestCase):
         unit.write_text("corrupt\n")
         repair_args = argparse.Namespace(**{**vars(self.args), "repair": True})
         result = INSTALLER.Installer(self.root, True).install(repair_args)
-        self.assertEqual(result["installed_version"], "1.1.0")
+        self.assertEqual(result["installed_version"], "1.1.1")
         self.assertEqual(config_path.read_text(), custom)
         self.assertNotEqual(unit.read_text(), "corrupt\n")
 

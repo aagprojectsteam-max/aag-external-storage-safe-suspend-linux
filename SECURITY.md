@@ -2,8 +2,8 @@
 
 ## Supported versions
 
-Security and storage-safety fixes are provided for v1.1.x. Public v1.0.0 can be
-upgraded directly to v1.1.0 without uninstalling.
+Security and storage-safety fixes are provided for v1.1.x. Public v1.0.0 and
+v1.1.0 can be upgraded directly to v1.1.1 without uninstalling.
 
 ## Reporting a vulnerability
 

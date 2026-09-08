@@ -3,6 +3,13 @@
 All notable changes are documented here. This project follows Semantic
 Versioning.
 
+## 1.1.1 — 2026-09-08
+
+- Extend health checks to execute the live, non-suspending target identity and
+  protected-mount validation and cross-check device/release state.
+- Canonicalize release archive modes across checkout umasks and generalize the
+  tag publication workflow for future versions.
+
 ## 1.1.0 — 2026-09-08
 
 - Add canonical installed state and exact public-v1.0.0 bootstrap.

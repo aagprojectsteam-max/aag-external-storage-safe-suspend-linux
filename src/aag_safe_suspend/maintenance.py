@@ -261,6 +261,17 @@ def inspect(root: Path | None = None, *, system_checks: bool = True) -> dict[str
     config_path = target(CONFIG_PATH, base)
     try:
         selected = config.load(config_path)
+        if state.get("configuration_schema") != CONFIG_SCHEMA:
+            broken.append("CONFIGURATION_SCHEMA_MISMATCH")
+        if state.get("selected_device") != selected["device"]:
+            broken.append("SELECTED_DEVICE_STATE_MISMATCH")
+        release = state.get("release")
+        if (
+            not isinstance(release, dict)
+            or release.get("tag") != f"v{state['installed_version']}"
+            or not release.get("source")
+        ):
+            broken.append("RELEASE_IDENTITY_MISMATCH")
         expected_rule = identity.udev_rule(selected, MARKER_PATH)
         if target(RULE_PATH, base).read_text() != expected_rule:
             broken.append("UDEV_RULE_CONFIGURATION_MISMATCH")
@@ -273,6 +284,14 @@ def inspect(root: Path | None = None, *, system_checks: bool = True) -> dict[str
             broken.append("ROLLBACK_METADATA_MISMATCH")
 
     if system_checks and base == Path("/"):
+        try:
+            from . import coordinator
+
+            live_validation = coordinator.validate_installation()
+            if live_validation.get("protected_mounts") != "healthy":
+                broken.append("PROTECTED_MOUNT_HEALTH_MISMATCH")
+        except Exception as exc:
+            broken.append(f"LIVE_IDENTITY_OR_PROTECTED_MOUNT_CHECK_FAILED:{exc}")
         for unit in (
             "aag-external-storage-safe-suspend.service",
             "aag-external-storage-safe-suspend-resume.service",

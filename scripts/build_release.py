@@ -14,7 +14,7 @@ import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 PROJECT = "aag-external-storage-safe-suspend-linux"
 EPOCH = 1788825600  # 2026-09-08T00:00:00Z
 EXCLUDES = {

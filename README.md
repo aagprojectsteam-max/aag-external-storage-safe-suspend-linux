@@ -74,13 +74,13 @@ The public release's independent retrieval checks are recorded in
 
 ## Install
 
-Download `aag-external-storage-safe-suspend-linux-v1.1.0.run`, `SHA256SUMS`,
-and `release-manifest.json` from the [v1.1.0 release], then verify before running:
+Download `aag-external-storage-safe-suspend-linux-v1.1.1.run`, `SHA256SUMS`,
+and `release-manifest.json` from the [v1.1.1 release], then verify before running:
 
 ```bash
 sha256sum --ignore-missing -c SHA256SUMS
-chmod +x aag-external-storage-safe-suspend-linux-v1.1.0.run
-sudo ./aag-external-storage-safe-suspend-linux-v1.1.0.run install \
+chmod +x aag-external-storage-safe-suspend-linux-v1.1.1.run
+sudo ./aag-external-storage-safe-suspend-linux-v1.1.1.run install \
   --device /dev/disk/by-id/your-external-backup-disk \
   --protect-mount /mnt/data \
   --timeshift
@@ -124,7 +124,7 @@ not the normal suspend path. See [the safety model](docs/SAFETY-MODEL.md).
 Use the same verified release asset:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.1.0.run uninstall
+sudo ./aag-external-storage-safe-suspend-linux-v1.1.1.run uninstall
 ```
 
 The uninstaller refuses while the fence or a conflicting systemd job is active,
@@ -139,13 +139,13 @@ Public v1.0.0 installations can upgrade directly without uninstalling. Verify
 the new release asset as above, then run it with no arguments:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.1.0.run
+sudo ./aag-external-storage-safe-suspend-linux-v1.1.1.run
 ```
 
 The installer verifies the exact v1.0.0 installation, preserves valid local
 device configuration byte for byte, snapshots the accepted state, applies only
 declared migrations, reloads systemd and udev metadata without starting a power
-operation, runs a non-destructive health check, and commits v1.1.0. Any failure
+operation, runs a non-destructive health check, and commits v1.1.1. Any failure
 before commit automatically restores the exact prior project state.
 
 Maintenance commands are:
@@ -163,8 +163,8 @@ The update check is opt-in and reports only; it never installs. Automatic
 download-and-execute is intentionally unavailable in v1.x. See [in-place
 upgrades](docs/UPGRADING.md), the [upgrade test matrix](docs/UPGRADE-TEST-MATRIX.md),
 and the [updater threat model](docs/UPDATER-THREAT-MODEL.md).
-Public artifact checks are recorded in the [v1.1.0 publication
-verification](docs/PUBLICATION-VERIFICATION-v1.1.0.md).
+Public artifact checks are recorded in the release publication-verification
+documents.
 
 ## Scope and limitations
 
@@ -206,4 +206,4 @@ make release-check
 The project is licensed under the [MIT License](LICENSE). Storage-safety flaws
 should be reported privately according to [SECURITY.md](SECURITY.md).
 
-[v1.1.0 release]: https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/releases/tag/v1.1.0
+[v1.1.1 release]: https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/releases/tag/v1.1.1
