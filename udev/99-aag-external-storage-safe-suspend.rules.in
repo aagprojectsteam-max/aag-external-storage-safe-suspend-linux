@@ -1,0 +1,3 @@
+# Generated at install time. Values below are placeholders, not valid defaults.
+# The installer emits one complete rule for each exact target filesystem UUID.
+ACTION=="add|change", SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_SERIAL_SHORT}=="@DEVICE_SERIAL@", ENV{ID_USB_VENDOR_ID}=="@USB_VENDOR_ID@", ENV{ID_USB_MODEL_ID}=="@USB_PRODUCT_ID@", ENV{ID_FS_UUID}=="@FILESYSTEM_UUID@", TEST=="/run/aag-external-storage-safe-suspend/automount-suppressed.json", ENV{UDISKS_AUTO}="0", ENV{AAG_SAFE_SUSPEND_TARGET}="1"

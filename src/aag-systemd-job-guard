@@ -1,0 +1,11 @@
+#!/usr/bin/python3
+from pathlib import Path
+import sys
+
+installed = Path("/usr/lib/aag-external-storage-safe-suspend")
+source = Path(__file__).resolve().parent
+sys.path.insert(0, str(installed if installed.is_dir() else source))
+
+from aag_safe_suspend.job_guard import main
+
+raise SystemExit(main())

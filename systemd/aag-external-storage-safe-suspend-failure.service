@@ -1,0 +1,10 @@
+[Unit]
+Description=Fail-closed recovery for external-storage suspend preparation
+Documentation=https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux
+After=systemd-suspend.service aag-external-storage-safe-suspend.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemd-inhibit --what=sleep --who=AAG-safe-suspend --why=Review-failed-external-storage-release --mode=block /usr/local/libexec/aag-safe-suspend recover
+TimeoutStartSec=20min
+TimeoutStopSec=10s

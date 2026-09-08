@@ -1,0 +1,17 @@
+[Unit]
+Description=Release one configured external backup device before suspend
+Documentation=https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux
+DefaultDependencies=no
+After=local-fs.target systemd-journald.socket
+Before=systemd-suspend.service sleep.target
+OnFailure=aag-external-storage-safe-suspend-failure.service
+StopWhenUnneeded=yes
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/usr/local/libexec/aag-safe-suspend begin
+ExecStart=/usr/local/libexec/aag-safe-suspend prepare
+ExecStopPost=-/usr/local/libexec/aag-safe-suspend teardown
+TimeoutStartSec=20min
+TimeoutStopSec=15s

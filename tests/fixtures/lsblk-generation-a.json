@@ -1,0 +1,60 @@
+{
+  "blockdevices": [
+    {
+      "name": "sdz",
+      "path": "/dev/sdz",
+      "type": "disk",
+      "pkname": null,
+      "serial": "TEST-NVME-0001",
+      "maj:min": "65:144",
+      "diskseq": "11",
+      "tran": "usb",
+      "children": [
+        {
+          "name": "sdz1",
+          "path": "/dev/sdz1",
+          "type": "part",
+          "pkname": "sdz",
+          "serial": null,
+          "uuid": "TEST-FS-A",
+          "fstype": "ext4",
+          "maj:min": "65:145",
+          "mountpoints": ["/media/test/backup-a"]
+        },
+        {
+          "name": "sdz2",
+          "path": "/dev/sdz2",
+          "type": "part",
+          "pkname": "sdz",
+          "serial": null,
+          "uuid": "TEST-FS-B",
+          "fstype": "exfat",
+          "maj:min": "65:146",
+          "mountpoints": []
+        }
+      ]
+    },
+    {
+      "name": "sdy",
+      "path": "/dev/sdy",
+      "type": "disk",
+      "pkname": null,
+      "serial": "UNRELATED-USB-0002",
+      "maj:min": "65:128",
+      "diskseq": "12",
+      "tran": "usb",
+      "children": [
+        {
+          "name": "sdy1",
+          "path": "/dev/sdy1",
+          "type": "part",
+          "pkname": "sdy",
+          "uuid": "UNRELATED-FS",
+          "fstype": "vfat",
+          "maj:min": "65:129",
+          "mountpoints": ["/media/test/unrelated"]
+        }
+      ]
+    }
+  ]
+}

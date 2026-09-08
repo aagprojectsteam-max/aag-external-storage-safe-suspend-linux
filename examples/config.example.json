@@ -1,0 +1,49 @@
+{
+  "device": {
+    "filesystem_uuids": [
+      "EXTERNAL-FILESYSTEM-UUID-ONE",
+      "EXTERNAL-FILESYSTEM-UUID-TWO"
+    ],
+    "profile": "rtl9210",
+    "serial": "EXTERNAL-DRIVE-SERIAL",
+    "usb_product_id": "9210",
+    "usb_vendor_id": "0bda"
+  },
+  "integration": {
+    "post_resume_command": [],
+    "pre_suspend_command": []
+  },
+  "managed_backup": {
+    "maximum_wait_seconds": 900,
+    "process_names": [
+      "timeshift",
+      "timeshift-gtk",
+      "timeshift.real",
+      "timeshift-gtk.real"
+    ],
+    "progress_stale_seconds": 120,
+    "quiesce_command": [],
+    "soft_wait_seconds": 120
+  },
+  "protected_mounts": [
+    {
+      "path": "/",
+      "uuid": "INTERNAL-ROOT-FILESYSTEM-UUID"
+    },
+    {
+      "path": "/mnt/data",
+      "uuid": "INTERNAL-DATA-FILESYSTEM-UUID"
+    }
+  ],
+  "resume": {
+    "audit_window_seconds": 15,
+    "enumeration_window_seconds": 15,
+    "poll_seconds": 0.2
+  },
+  "thermal": {
+    "emergency_action": "none",
+    "unknown_ceiling_seconds": 300,
+    "warning_grace_seconds": 60
+  },
+  "version": 1
+}

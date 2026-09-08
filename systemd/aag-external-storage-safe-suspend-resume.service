@@ -1,0 +1,14 @@
+[Unit]
+Description=Terminal external-storage audit after resume
+Documentation=https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux
+After=systemd-suspend.service suspend.target systemd-journald.socket
+Before=shutdown.target
+Conflicts=shutdown.target
+ConditionPathExists=/run/aag-external-storage-safe-suspend/automount-suppressed.json
+OnFailure=aag-external-storage-safe-suspend-failure.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemd-inhibit --what=sleep --who=AAG-safe-suspend --why=Finish-external-storage-resume-audit --mode=block /usr/local/libexec/aag-safe-suspend resume
+TimeoutStartSec=7min
+TimeoutStopSec=10s
