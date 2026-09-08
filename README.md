@@ -163,6 +163,8 @@ The update check is opt-in and reports only; it never installs. Automatic
 download-and-execute is intentionally unavailable in v1.x. See [in-place
 upgrades](docs/UPGRADING.md), the [upgrade test matrix](docs/UPGRADE-TEST-MATRIX.md),
 and the [updater threat model](docs/UPDATER-THREAT-MODEL.md).
+Public artifact checks are recorded in the [v1.1.0 publication
+verification](docs/PUBLICATION-VERIFICATION-v1.1.0.md).
 
 ## Scope and limitations
 

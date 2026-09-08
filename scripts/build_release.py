@@ -9,6 +9,7 @@ import hashlib
 import io
 import json
 import shutil
+import stat
 import tarfile
 from pathlib import Path
 
@@ -31,6 +32,11 @@ EXCLUDES = {
 
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def canonical_mode(path: Path) -> int:
+    """Ignore checkout umask while preserving the Git executable distinction."""
+    return 0o755 if path.stat().st_mode & stat.S_IXUSR else 0o644
 
 
 def public_files() -> list[Path]:
@@ -57,7 +63,7 @@ def tar_bytes(prefix: str = "") -> tuple[bytes, dict[str, str]]:
             name = str(Path(prefix) / relative) if prefix else str(relative)
             info = tarfile.TarInfo(name)
             info.size = len(data)
-            info.mode = (ROOT / relative).stat().st_mode & 0o777
+            info.mode = canonical_mode(ROOT / relative)
             info.mtime = EPOCH
             info.uid = info.gid = 0
             info.uname = info.gname = "root"

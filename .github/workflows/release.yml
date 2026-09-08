@@ -23,11 +23,8 @@ jobs:
       - name: Publish verified assets
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "$GITHUB_REF_NAME"
-          dist/aag-external-storage-safe-suspend-linux-v1.1.0.run
-          dist/aag-external-storage-safe-suspend-linux-v1.1.0.tar.gz
-          dist/SHA256SUMS
-          dist/release-manifest.json
-          --title "External Storage Safe Suspend v1.1.0"
-          --notes-file docs/RELEASE-NOTES-v1.1.0.md
+        run: |
+          test -f "docs/RELEASE-NOTES-${GITHUB_REF_NAME}.md"
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "External Storage Safe Suspend ${GITHUB_REF_NAME}" \
+            --notes-file "docs/RELEASE-NOTES-${GITHUB_REF_NAME}.md"
