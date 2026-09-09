@@ -8,7 +8,6 @@ import json
 import os
 import shutil
 import signal
-import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -60,14 +59,7 @@ class UpgradeTests(unittest.TestCase):
         if logical.endswith("/job_guard.py"):
             return ROOT / "tests/fixtures/v1.0.0/job_guard.py"
         if logical.endswith(("/config.py", "/coordinator.py")):
-            name = Path(logical).name
-            fixture = self.root / f".public-v1-{name}"
-            fixture.write_bytes(
-                subprocess.check_output(
-                    ["git", "show", f"v1.0.0:src/aag_safe_suspend/{name}"], cwd=ROOT
-                )
-            )
-            return fixture
+            return ROOT / "tests/fixtures/v1.0.0" / Path(logical).name
         for destination, (source, _mode) in INSTALLER.FILES.items():
             if destination == target:
                 return source
