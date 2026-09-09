@@ -37,7 +37,7 @@ class InstallerTests(unittest.TestCase):
     def test_install_verify_uninstall_round_trip(self) -> None:
         installer = INSTALLER.Installer(self.root, True)
         manifest = installer.install(self.args)
-        self.assertEqual(manifest["installed_version"], "1.1.1")
+        self.assertEqual(manifest["installed_version"], "1.2.0")
         self.assertTrue(
             (self.root / "etc/udev/rules.d/99-aag-external-storage-safe-suspend.rules").is_file()
         )
@@ -54,7 +54,7 @@ class InstallerTests(unittest.TestCase):
     def test_idempotent_reinstall(self) -> None:
         INSTALLER.Installer(self.root, True).install(self.args)
         second = INSTALLER.Installer(self.root, True).install(self.args)
-        self.assertEqual(second["version"], "1.1.1")
+        self.assertEqual(second["version"], "1.2.0")
         self.assertEqual(second["result"], "SAME_VERSION")
         INSTALLER.Installer(self.root, True).uninstall()
         self.assertEqual(INSTALLER.sha256(self.root / "usr/bin/timeshift"), self.original)

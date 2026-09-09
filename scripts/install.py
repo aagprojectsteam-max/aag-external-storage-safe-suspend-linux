@@ -36,8 +36,8 @@ TIMESHIFT_GTK_REAL = Path("/usr/lib") / PROJECT / "timeshift-gtk.real"
 PRODUCT_ID = "aag-external-storage-safe-suspend-linux"
 UPGRADER_SCHEMA = 2
 STATE_SCHEMA = 1
-CONFIG_SCHEMA = 1
-MIGRATION_SCHEMA = 1
+CONFIG_SCHEMA = 2
+MIGRATION_SCHEMA = 2
 MAX_ROLLBACK_GENERATIONS = 3
 
 # Fixed identities from the public v1.0.0 tag.  Configuration and the generated
@@ -64,6 +64,49 @@ LEGACY_V1_TIMESHIFT_HASHES = {
     "/usr/bin/timeshift-gtk": "c7b6811bbadd402baf7d66145db6b56b12bda17cc9f5b42219bb1db2a678f52a",
 }
 
+# Final accepted local qualification payload. A v1.1.1 reference machine may
+# contain these untracked qualification-owned files. They are adopted only as
+# an all-or-nothing, exact-hash migration; partial or changed sets fail before
+# mutation. Raw evidence and qualification state are never read or removed.
+ACCEPTED_QUALIFICATION_V1 = {
+    "/usr/local/libexec/aag-hibernate-qualifier": (
+        "a41dd9f9a33e0894fc70f16b3bf04bf220d284fbcb21406932f82d64a5dd143e",
+        0o755,
+    ),
+    "/usr/local/libexec/aag-hibernate-wwan-qualified-recover": (
+        "805e815edf1562e51c450ef2035f45cf245bdcc1a8a82dd4e783de277cfb60ac",
+        0o755,
+    ),
+    "/usr/local/sbin/aag-hibernate-acceptance": (
+        "05c5f2b60fb8364c7505d832ab46522b731465243be268562c5520c113bd69d9",
+        0o755,
+    ),
+    "/etc/systemd/system/aag-hibernate-resume-check.service": (
+        "82f9c000871131b63663c7ab1788b27ce64cf3cedab10b04da54834d7be9b32a",
+        0o644,
+    ),
+    "/etc/systemd/system/aag-hibernate-wwan-recovery.service": (
+        "5332b272f4567363b431f65afaf40edda5a8a5eebaa31343b1e2db949c25b778",
+        0o644,
+    ),
+    "/etc/systemd/system/aag-hibernate-abort-reconcile.service": (
+        "4183c0571b0141a70baee1f707f00e4364ebd14997087517ca545e8f5722a578",
+        0o644,
+    ),
+    "/etc/systemd/system/aag-hibernate-boot-check.service": (
+        "9aa4faca2211112711d4e9ff02fbb6ea51bfe091852abeed9682b894ab28796f",
+        0o644,
+    ),
+    "/etc/systemd/system/systemd-hibernate.service.d/80-aag-hibernate-qualification.conf": (
+        "9399795896b1cc04144d7553003794bbca63a734fe63169c2dfb765fd25dc98f",
+        0o644,
+    ),
+    "/etc/systemd/system/aag-suspend-failure-failsafe.service.d/80-aag-hibernate-qualification.conf": (
+        "3b7b8ec74eb28b803c94b9a003e19e0a0de9dfd40979977f952f1e43b0169c1d",
+        0o644,
+    ),
+}
+
 FILES = {
     Path("/usr/local/bin/aag-safe-suspend"): (SOURCE / "src/aag-safe-suspend", 0o755),
     Path("/usr/local/libexec/aag-safe-suspend"): (SOURCE / "src/aag-safe-suspend", 0o755),
@@ -84,6 +127,28 @@ FILES = {
         "/etc/systemd/system/systemd-suspend.service.d/70-aag-external-storage-safe-suspend.conf"
     ): (
         SOURCE / "systemd/systemd-suspend.service.d/70-aag-external-storage-safe-suspend.conf",
+        0o644,
+    ),
+    Path(
+        "/etc/systemd/system/systemd-hibernate.service.d/70-aag-external-storage-safe-hibernate.conf"
+    ): (
+        SOURCE / "systemd/systemd-hibernate.service.d/70-aag-external-storage-safe-hibernate.conf",
+        0o644,
+    ),
+    Path("/etc/systemd/system/aag-external-storage-safe-hibernate-resume.service"): (
+        SOURCE / "systemd/aag-external-storage-safe-hibernate-resume.service",
+        0o644,
+    ),
+    Path("/etc/systemd/system/aag-external-storage-safe-hibernate-wwan.service"): (
+        SOURCE / "systemd/aag-external-storage-safe-hibernate-wwan.service",
+        0o644,
+    ),
+    Path("/etc/systemd/system/aag-external-storage-safe-hibernate-abort.service"): (
+        SOURCE / "systemd/aag-external-storage-safe-hibernate-abort.service",
+        0o644,
+    ),
+    Path("/etc/systemd/system/aag-external-storage-safe-hibernate-boot-check.service"): (
+        SOURCE / "systemd/aag-external-storage-safe-hibernate-boot-check.service",
         0o644,
     ),
 }
@@ -138,6 +203,7 @@ class Installer:
         self.previous_version: str | None = None
         self.rollback_generation: Path | None = None
         self.lock_stream: Any | None = None
+        self.accepted_qualification: list[Path] = []
 
     def target(self, path: Path) -> Path:
         if not path.is_absolute() or ".." in path.parts or "\x00" in str(path):
@@ -186,9 +252,13 @@ class Installer:
                     raise InstallError(f"required executable is missing: {executable}")
             for unit in (
                 "systemd-suspend.service",
+                "systemd-hibernate.service",
                 "aag-external-storage-safe-suspend.service",
                 "aag-external-storage-safe-suspend-resume.service",
                 "aag-external-storage-safe-suspend-failure.service",
+                "aag-external-storage-safe-hibernate-resume.service",
+                "aag-external-storage-safe-hibernate-wwan.service",
+                "aag-external-storage-safe-hibernate-abort.service",
             ):
                 state = command(
                     ["/usr/bin/systemctl", "show", unit, "-p", "ActiveState", "--value"],
@@ -211,6 +281,14 @@ class Installer:
         jobs = runtime / "jobs"
         if jobs.is_dir() and any(jobs.glob("*.json")):
             raise InstallError("active protected backup lifecycle is registered")
+        hibernate_episode = self.target(STATE_ROOT / "hibernate-episode.json")
+        if hibernate_episode.is_file() and not hibernate_episode.is_symlink():
+            try:
+                hibernate_status = json.loads(hibernate_episode.read_text()).get("status")
+            except (OSError, TypeError, ValueError) as exc:
+                raise InstallError(f"Hibernate episode state is unreadable: {exc}") from exc
+            if hibernate_status in {"ARMED", "IMAGE_GATE_PASSED", "NATIVE_RETURNED"}:
+                raise InstallError(f"Hibernate transaction is active: {hibernate_status}")
 
     def new_transaction(self, operation: str) -> Path:
         stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
@@ -334,6 +412,31 @@ class Installer:
             raise InstallError("PARTIAL_INSTALLATION: managed state is missing")
         return None
 
+    def detect_accepted_qualification(self) -> list[Path]:
+        observed = [
+            Path(logical)
+            for logical in ACCEPTED_QUALIFICATION_V1
+            if self.target(Path(logical)).exists() or self.target(Path(logical)).is_symlink()
+        ]
+        if not observed:
+            return []
+        if len(observed) != len(ACCEPTED_QUALIFICATION_V1):
+            raise InstallError("partial accepted Hibernate qualification payload requires review")
+        expected_uid = os.getuid() if self.test_mode else 0
+        for logical in observed:
+            path = self.target(logical)
+            expected_hash, expected_mode = ACCEPTED_QUALIFICATION_V1[str(logical)]
+            info = path.lstat()
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or stat.S_ISLNK(info.st_mode)
+                or info.st_uid != expected_uid
+                or stat.S_IMODE(info.st_mode) != expected_mode
+                or sha256(path) != expected_hash
+            ):
+                raise InstallError(f"accepted Hibernate qualification identity mismatch: {logical}")
+        return sorted(observed)
+
     def bootstrap_legacy(self, legacy: dict[str, Any]) -> dict[str, Any]:
         if legacy.get("version") != "1.0.0" or not isinstance(legacy.get("files"), dict):
             raise InstallError("UNSUPPORTED_MIGRATION: legacy state is not public v1.0.0")
@@ -374,7 +477,7 @@ class Installer:
             "installed_at": legacy.get("installed"),
             "upgrader_schema": 1,
             "state_schema": STATE_SCHEMA,
-            "configuration_schema": CONFIG_SCHEMA,
+            "configuration_schema": 1,
             "migration_schema": 0,
             "operation": "COMMITTED",
             "release": {"tag": "v1.0.0", "source": "PUBLIC_LEGACY_BOOTSTRAP"},
@@ -504,6 +607,16 @@ class Installer:
             shutil.copy2(source, destination)
             metadata["sha256"] = sha256(source)
             metadata["mode"] = source.stat().st_mode & 0o777
+        qualification_files: dict[str, Any] = {}
+        for logical in self.accepted_qualification:
+            source = self.target(logical)
+            destination = generation / "qualification-root" / logical.relative_to("/")
+            destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+            qualification_files[str(logical)] = {
+                "sha256": sha256(source),
+                "mode": source.stat().st_mode & 0o777,
+            }
         state_path = generation / "install-state.json"
         state_path.write_text(json.dumps(snapshot_state, sort_keys=True, indent=2) + "\n")
         os.chmod(state_path, 0o600)
@@ -527,6 +640,7 @@ class Installer:
             "migration_schema": snapshot_state.get("migration_schema", 0),
             "compatible": rollback_compatible,
             "reason": rollback_reason,
+            "accepted_qualification_files": qualification_files,
         }
         record_path = generation / "rollback.json"
         record_path.write_text(json.dumps(record, sort_keys=True, indent=2) + "\n")
@@ -747,7 +861,12 @@ class Installer:
             "aag-external-storage-safe-suspend.service",
             "aag-external-storage-safe-suspend-resume.service",
             "aag-external-storage-safe-suspend-failure.service",
+            "aag-external-storage-safe-hibernate-resume.service",
+            "aag-external-storage-safe-hibernate-wwan.service",
+            "aag-external-storage-safe-hibernate-abort.service",
+            "aag-external-storage-safe-hibernate-boot-check.service",
             "systemd-suspend.service",
+            "systemd-hibernate.service",
         ):
             state = command(["/usr/bin/systemctl", "show", unit, "-p", "LoadState", "--value"])
             if state.stdout.strip() != "loaded":
@@ -759,15 +878,29 @@ class Installer:
                 "aag-external-storage-safe-suspend.service",
                 "aag-external-storage-safe-suspend-resume.service",
                 "aag-external-storage-safe-suspend-failure.service",
+                "aag-external-storage-safe-hibernate-resume.service",
+                "aag-external-storage-safe-hibernate-wwan.service",
+                "aag-external-storage-safe-hibernate-abort.service",
+                "aag-external-storage-safe-hibernate-boot-check.service",
                 "systemd-suspend.service",
+                "systemd-hibernate.service",
             ]
         )
         command(["/usr/local/libexec/aag-safe-suspend", "validate"])
+        if config["hibernate"]["enabled"]:
+            readiness = command(["/usr/local/libexec/aag-safe-suspend", "health-check"])
+            if '"HIBERNATE_READY": "PASS"' not in readiness.stdout:
+                raise InstallError("reference-platform Hibernate readiness gates did not pass")
         self.guard_clear("post-installed-validation")
 
     def install(self, args: argparse.Namespace) -> dict[str, Any]:
         self.ensure_environment()
         active = self.load_active()
+        self.accepted_qualification = self.detect_accepted_qualification()
+        if self.accepted_qualification and not active:
+            raise InstallError(
+                "accepted Hibernate qualification payload requires a managed public installation"
+            )
         repair_requested = bool(getattr(args, "repair", False))
         operation = self.classify_install(active, repair_requested)
         self.installation_mode = (
@@ -811,7 +944,12 @@ class Installer:
                 )
             )
 
-        if operation == "SAME_VERSION":
+        enable_reference_hibernate = bool(getattr(args, "enable_reference_hibernate", False))
+        if (
+            operation == "SAME_VERSION"
+            and not enable_reference_hibernate
+            and not self.accepted_qualification
+        ):
             result = maintenance.inspect(self.root, system_checks=False)
             return {
                 "result": "SAME_VERSION",
@@ -820,6 +958,14 @@ class Installer:
                 "hint": "use --repair to restore project-managed files",
             }
 
+        # An exact accepted-qualification payload proves that this managed
+        # reference installation already opted into plain Hibernate. Preserve
+        # that accepted capability while replacing qualification-only files
+        # with their public, project-managed equivalents.
+        if enable_reference_hibernate or self.accepted_qualification:
+            selected_config["hibernate"]["enabled"] = True
+            selected_config["hibernate"]["t700"]["enabled"] = True
+            selected_config = configuration.validate(selected_config)
         rule = identity.udev_rule(selected_config, MARKER_PATH).encode()
         paths = list(FILES) + [CONFIG_PATH, RULE_PATH]
         timeshift_requested = bool(
@@ -839,6 +985,7 @@ class Installer:
             migration_plan = migrations.plan(
                 active,
                 legacy_bootstrap=self.installation_mode == "LEGACY_BOOTSTRAP_UPGRADE",
+                accepted_qualification=bool(self.accepted_qualification),
             )
             if active:
                 migrations.apply(active, migration_plan)
@@ -856,9 +1003,19 @@ class Installer:
                     (json.dumps(pending, sort_keys=True, indent=2) + "\n").encode(),
                     0o600,
                 )
+            for logical in self.accepted_qualification:
+                self.backup(logical)
+                self.target(logical).unlink()
+                self.mutated.append(logical)
             for logical, (source, mode) in FILES.items():
                 self.install_file(logical, source, mode)
-            if not active or args.config or args.device:
+            if (
+                not active
+                or args.config
+                or args.device
+                or enable_reference_hibernate
+                or active.get("configuration_schema", 1) < CONFIG_SCHEMA
+            ):
                 self.install_bytes(CONFIG_PATH, configuration.dump(selected_config).encode(), 0o600)
             self.install_bytes(RULE_PATH, rule, 0o644)
             timeshift = timeshift_requested
@@ -890,7 +1047,7 @@ class Installer:
                 "state_schema": STATE_SCHEMA,
                 "configuration_schema": CONFIG_SCHEMA,
                 "migration_schema": MIGRATION_SCHEMA,
-                "systemd_wiring_revision": 1,
+                "systemd_wiring_revision": 2,
                 "udev_rule_revision": 1,
                 "operation": "COMMITTED",
                 "release": {
@@ -916,7 +1073,7 @@ class Installer:
                 "compatibility": {
                     "upgrade_from": ">=1.0.0,<1.2.0",
                     "downgrade": "explicit-compatible-snapshot-only",
-                    "runtime_architecture": "suspend-contract-v1",
+                    "runtime_architecture": "suspend-contract-v1+plain-hibernate-reference-v1",
                 },
                 "backup_metadata": {
                     "rollback_generations_maximum": MAX_ROLLBACK_GENERATIONS,
@@ -972,6 +1129,7 @@ class Installer:
             Path("/usr/lib") / PROJECT,
             Path("/etc") / PROJECT,
             Path("/etc/systemd/system/systemd-suspend.service.d"),
+            Path("/etc/systemd/system/systemd-hibernate.service.d"),
         ):
             with contextlib.suppress(OSError):
                 self.target(logical).rmdir()
@@ -1075,6 +1233,11 @@ def parser() -> argparse.ArgumentParser:
     install.add_argument("--config", help="pre-reviewed configuration JSON")
     install.add_argument("--protect-mount", action="append", default=[])
     install.add_argument("--timeshift", action="store_true")
+    install.add_argument(
+        "--enable-reference-hibernate",
+        action="store_true",
+        help="enable physically accepted plain-Hibernate policy for the documented reference platform",
+    )
     install.add_argument(
         "--repair",
         action="store_true",

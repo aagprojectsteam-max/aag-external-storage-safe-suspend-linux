@@ -13,6 +13,22 @@
     "post_resume_command": [],
     "pre_suspend_command": []
   },
+  "hibernate": {
+    "enabled": false,
+    "swap_file": "/swap.img",
+    "t700": {
+      "connect_timeout_seconds": 15,
+      "enabled": false,
+      "modem_timeout_seconds": 35,
+      "pci_device": "0x4d75",
+      "pci_vendor": "0x14c3",
+      "recovery_command": [],
+      "recovery_timeout_seconds": 100,
+      "settle_seconds": 110,
+      "stability_timeout_seconds": 30,
+      "stable_seconds": 10
+    }
+  },
   "managed_backup": {
     "maximum_wait_seconds": 900,
     "process_names": [
@@ -45,5 +61,5 @@
     "unknown_ceiling_seconds": 300,
     "warning_grace_seconds": 60
   },
-  "version": 1
+  "version": 2
 }

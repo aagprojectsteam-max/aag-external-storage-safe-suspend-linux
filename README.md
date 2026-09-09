@@ -4,7 +4,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 `aag-external-storage-safe-suspend-linux` protects one explicitly selected
-external backup disk across ordinary Linux suspend. It cleanly releases the
+external backup disk across ordinary Linux suspend and qualified plain
+Hibernate. It cleanly releases the
 external filesystems before sleep, keeps designated internal storage mounted,
 and closes the GNOME/udisks automount race after the USB bridge re-enumerates on
 resume.
@@ -68,19 +69,21 @@ internal storage, a continued user session, and zero orderly-poweroff requests.
 
 See [tested hardware](docs/TESTED-HARDWARE.md) and the normalized
 [acceptance record](docs/ACCEPTANCE.md). Those results validate that reference
-platform, not every enclosure, filesystem, desktop, kernel, or firmware.
-The public release's independent retrieval checks are recorded in
-[publication verification](docs/PUBLICATION-VERIFICATION.md).
+platform, not every enclosure, filesystem, desktop, kernel, or firmware. Plain
+Hibernate is separately physically accepted on that reference platform; it is
+opt-in and guarded by live resume-mapping and capacity checks.
+Each release is independently retrieved and verified after publication; the
+versioned verification record is then committed to the default branch.
 
 ## Install
 
-Download `aag-external-storage-safe-suspend-linux-v1.1.1.run`, `SHA256SUMS`,
-and `release-manifest.json` from the [v1.1.1 release], then verify before running:
+Download `aag-external-storage-safe-suspend-linux-v1.2.0.run`, `SHA256SUMS`,
+and `release-manifest.json` from the [v1.2.0 release], then verify before running:
 
 ```bash
 sha256sum --ignore-missing -c SHA256SUMS
-chmod +x aag-external-storage-safe-suspend-linux-v1.1.1.run
-sudo ./aag-external-storage-safe-suspend-linux-v1.1.1.run install \
+chmod +x aag-external-storage-safe-suspend-linux-v1.2.0.run
+sudo ./aag-external-storage-safe-suspend-linux-v1.2.0.run install \
   --device /dev/disk/by-id/your-external-backup-disk \
   --protect-mount /mnt/data \
   --timeshift
@@ -124,7 +127,7 @@ not the normal suspend path. See [the safety model](docs/SAFETY-MODEL.md).
 Use the same verified release asset:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.1.1.run uninstall
+sudo ./aag-external-storage-safe-suspend-linux-v1.2.0.run uninstall
 ```
 
 The uninstaller refuses while the fence or a conflicting systemd job is active,
@@ -135,18 +138,24 @@ action.
 
 ## Update in place
 
-Public v1.0.0 installations can upgrade directly without uninstalling. Verify
+Public v1.0.0 through v1.1.1 installations can upgrade directly without
+uninstalling. Verify
 the new release asset as above, then run it with no arguments:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.1.1.run
+sudo ./aag-external-storage-safe-suspend-linux-v1.2.0.run
 ```
 
 The installer verifies the exact v1.0.0 installation, preserves valid local
 device configuration byte for byte, snapshots the accepted state, applies only
 declared migrations, reloads systemd and udev metadata without starting a power
-operation, runs a non-destructive health check, and commits v1.1.1. Any failure
+operation, runs a non-destructive health check, and commits v1.2.0. Any failure
 before commit automatically restores the exact prior project state.
+
+On the accepted reference machine, the exact final qualification payload is
+recognized and transactionally adopted; its already-accepted plain-Hibernate
+and T700 policy remains enabled. Other upgrades receive disabled Hibernate
+defaults unless `--enable-reference-hibernate` is explicitly supplied.
 
 Maintenance commands are:
 
@@ -163,8 +172,45 @@ The update check is opt-in and reports only; it never installs. Automatic
 download-and-execute is intentionally unavailable in v1.x. See [in-place
 upgrades](docs/UPGRADING.md), the [upgrade test matrix](docs/UPGRADE-TEST-MATRIX.md),
 and the [updater threat model](docs/UPDATER-THREAT-MODEL.md).
-Public artifact checks are recorded in the [v1.1.1 publication
-verification](docs/PUBLICATION-VERIFICATION-v1.1.1.md).
+Public artifact checks are recorded in the release publication-verification
+record after independent retrieval.
+
+## Plain Hibernate on the reference platform
+
+Plain Hibernate is supported and physically accepted only on the documented
+reference platform. It preserved the running desktop session through a real
+image write, complete power-off, manual power-on, and image restoration. The
+external UGREEN storage received the same clean release, targeted automount
+suppression, and terminal owner audit as ordinary suspend.
+
+Enable the reference policy during a fresh install or compatible upgrade:
+
+```bash
+sudo ./aag-external-storage-safe-suspend-linux-v1.2.0.run install \
+  --enable-reference-hibernate
+sudo aag-safe-suspend health-check
+```
+
+Every reported Hibernate gate must pass before using the project command:
+
+```bash
+sudo aag-safe-suspend hibernate
+```
+
+The command validates the current swapfile, resume device and offset, initramfs
+resume support, image capacity, memory pressure, kernel support, external
+storage fence, and optional T700 integration before entering the native systemd
+plain-Hibernate path. It does not enable Hibernate automatically, schedule it,
+or use it as a hot-bag fallback.
+
+On the accepted T700 reference configuration, recovery waits for the later
+post-S4 device generation to become stable for ten consecutive seconds,
+performs one bounded ModemManager recovery, and requires both ModemManager
+enumeration and NetworkManager WWAN connectivity. GNSS remains on demand.
+
+Suspend-then-hibernate and hybrid sleep are not enabled and have not been
+accepted. See [Hibernate](docs/HIBERNATE.md), [T700 WWAN recovery](docs/T700-WWAN-HIBERNATE.md),
+and [tested hardware](docs/TESTED-HARDWARE.md).
 
 ## Scope and limitations
 
@@ -184,10 +230,11 @@ Tested behavior and design support are deliberately different:
   hangs remain outside software guarantees; Timeshift integration covers the
   diverted CLI/GTK entry points, not arbitrary direct execution of private
   binaries.
-- **Hibernate:** experimental/unsupported. It was not separately accepted and
-  this project does not enable hibernate or suspend-then-hibernate.
-- **Modem/GNSS:** no modem code or evidence is included. Coexistence was tested
-  on the reference machine only through generic integration boundaries.
+- **Plain Hibernate:** supported and physically accepted on the reference
+  platform only; opt-in readiness gates fail closed elsewhere.
+- **Suspend-then-hibernate / hybrid sleep:** not enabled and not accepted.
+- **Modem/GNSS:** the reference T700 recovery is mode-specific; no modem
+  identifiers, AT commands, GNSS activation, or raw evidence are included.
 
 Further reading: [architecture](docs/ARCHITECTURE.md),
 [GNOME/udisks race](docs/GNOME-UDISKS-AUTOMOUNT.md),
@@ -206,4 +253,4 @@ make release-check
 The project is licensed under the [MIT License](LICENSE). Storage-safety flaws
 should be reported privately according to [SECURITY.md](SECURITY.md).
 
-[v1.1.1 release]: https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/releases/tag/v1.1.1
+[v1.2.0 release]: https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/releases/tag/v1.2.0

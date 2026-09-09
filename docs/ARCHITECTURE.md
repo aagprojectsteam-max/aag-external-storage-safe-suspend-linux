@@ -71,17 +71,36 @@ cleanly removed and re-audited; a new writer or identity change holds the fence.
 The marker is deleted only after terminal success. `/run` makes stale
 suppression impossible across reboot.
 
+## Plain-Hibernate sequence
+
+The reference-platform plain-Hibernate path is an opt-in sibling transaction,
+not a change to `systemd-suspend.service`. A dedicated
+`systemd-hibernate.service` drop-in requires the same accepted external-storage
+preparation service, then runs a final current resume-mapping and capacity gate
+before native image creation. After native S4 return, the mode-specific T700
+service waits for a stable regenerated device identity and verifies WWAN. The
+Hibernate terminal service then calls the existing external-storage resume
+audit and releases the fence.
+
+An armed, root-owned durable episode distinguishes an image resume from a cold
+boot. Its one-cycle boot detector is enabled only around an explicit
+`aag-safe-suspend hibernate` transaction and disables itself after either a
+successful resume or a detected cold boot. Abort reconciliation never retries
+Hibernate or initiates another power action.
+
 ## Integration boundary
 
 Optional pre-suspend and post-resume argv hooks are serialized inside the
 transaction and must return success. They are an integration boundary, not a
-license to weaken the storage audit. Modem, GNSS, VM, and vendor-specific policy
-remain separate projects.
+license to weaken the storage audit. VM and unrelated vendor policy remain
+separate projects. The optional reference T700 integration is confined to plain
+Hibernate; it does not alter ordinary suspend, send AT commands, or start GNSS.
 
 ## Installed state and upgrades
 
-The runtime architecture above remains `suspend-contract-v1`. Maintenance is a
-separate transaction around project-owned installation paths. Canonical
+The ordinary runtime architecture remains `suspend-contract-v1`; v1.2.0 adds
+the separate `plain-hibernate-reference-v1` contract. Maintenance is a separate
+transaction around project-owned installation paths. Canonical
 root-only state records schemas, release identity, file ownership classes and
 hashes, selected configuration identity, migrations, pristine repair payload,
 and one compatible rollback pointer. The public v1.0.0 legacy state is accepted
@@ -93,3 +112,7 @@ schema migrations, atomically replaces allowlisted files, reloads systemd and
 udev metadata, validates the merged graph and rule, and commits the new state
 last. Precommit failure reverses the mutation list. Repair and deliberate
 rollback use the same active-transaction guard and local transactional writer.
+Config schema 1 to 2 adds disabled Hibernate defaults while preserving existing
+supported values. Wiring revision 2 adds only Hibernate-specific units and the
+`systemd-hibernate.service` drop-in; rollback restores the prior exact unit and
+configuration snapshots.

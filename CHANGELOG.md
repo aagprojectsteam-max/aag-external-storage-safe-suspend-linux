@@ -3,6 +3,18 @@
 All notable changes are documented here. This project follows Semantic
 Versioning.
 
+## 1.2.0 — 2026-09-09
+
+- Add physically accepted, reference-platform-only plain Hibernate support.
+- Add fail-closed resume mapping, swapfile, initramfs, capacity, memory and
+  current-kernel readiness gates.
+- Add Hibernate-only storage ordering, cold-boot detection, abort reconciliation
+  and terminal audit without changing the ordinary-suspend graph.
+- Add delayed stable-generation T700 recovery with bounded ModemManager and
+  NetworkManager verification while leaving GNSS on demand.
+- Add transactional config/wiring migrations and direct v1.1.1 upgrade and
+  exact rollback coverage.
+
 ## 1.1.1 — 2026-09-08
 
 - Extend health checks to execute the live, non-suspending target identity and

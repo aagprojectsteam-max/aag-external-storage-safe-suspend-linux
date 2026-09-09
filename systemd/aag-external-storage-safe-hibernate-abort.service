@@ -1,0 +1,10 @@
+[Unit]
+Description=Reconcile a refused or failed plain-Hibernate transaction
+Documentation=https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux
+After=systemd-hibernate.service aag-external-storage-safe-suspend.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemd-inhibit --what=sleep --who=AAG-safe-Hibernate --why=Reconcile-failed-Hibernate-without-retry --mode=block /usr/local/libexec/aag-safe-suspend hibernate-abort
+TimeoutStartSec=7min
+TimeoutStopSec=10s

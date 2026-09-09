@@ -30,8 +30,8 @@ PRODUCT_ID = "aag-external-storage-safe-suspend-linux"
 PROJECT = "aag-external-storage-safe-suspend"
 STATE_SCHEMA = 1
 UPGRADER_SCHEMA = 2
-CONFIG_SCHEMA = 1
-MIGRATION_SCHEMA = 1
+CONFIG_SCHEMA = 2
+MIGRATION_SCHEMA = 2
 STATE_ROOT = Path("/var/lib") / PROJECT
 INSTALL_STATE = STATE_ROOT / "install-state.json"
 LOCK_PATH = STATE_ROOT / "installer.lock"
@@ -42,6 +42,20 @@ RELEASE_API = (
     "https://api.github.com/repos/aagprojectsteam-max/"
     "aag-external-storage-safe-suspend-linux/releases/latest"
 )
+ACCEPTED_QUALIFICATION_PATHS = {
+    Path("/usr/local/libexec/aag-hibernate-qualifier"),
+    Path("/usr/local/libexec/aag-hibernate-wwan-qualified-recover"),
+    Path("/usr/local/sbin/aag-hibernate-acceptance"),
+    Path("/etc/systemd/system/aag-hibernate-resume-check.service"),
+    Path("/etc/systemd/system/aag-hibernate-wwan-recovery.service"),
+    Path("/etc/systemd/system/aag-hibernate-abort-reconcile.service"),
+    Path("/etc/systemd/system/aag-hibernate-boot-check.service"),
+    Path("/etc/systemd/system/systemd-hibernate.service.d/80-aag-hibernate-qualification.conf"),
+    Path(
+        "/etc/systemd/system/aag-suspend-failure-failsafe.service.d/"
+        "80-aag-hibernate-qualification.conf"
+    ),
+}
 
 EXIT_STATUS = {
     "HEALTHY": 0,
@@ -142,6 +156,14 @@ def load_install_state(root: Path | None = None) -> dict[str, Any]:
                 "/etc/systemd/system/systemd-suspend.service.d/"
                 "70-aag-external-storage-safe-suspend.conf"
             ),
+            Path(
+                "/etc/systemd/system/systemd-hibernate.service.d/"
+                "70-aag-external-storage-safe-hibernate.conf"
+            ),
+            Path("/etc/systemd/system/aag-external-storage-safe-hibernate-resume.service"),
+            Path("/etc/systemd/system/aag-external-storage-safe-hibernate-wwan.service"),
+            Path("/etc/systemd/system/aag-external-storage-safe-hibernate-abort.service"),
+            Path("/etc/systemd/system/aag-external-storage-safe-hibernate-boot-check.service"),
         }
         module_root = Path("/usr/lib") / PROJECT / "aag_safe_suspend"
         module = (
@@ -261,7 +283,10 @@ def inspect(root: Path | None = None, *, system_checks: bool = True) -> dict[str
     config_path = target(CONFIG_PATH, base)
     try:
         selected = config.load(config_path)
-        if state.get("configuration_schema") != CONFIG_SCHEMA:
+        expected_config_schema = (
+            1 if _parse_version(str(state["installed_version"])) < (1, 2, 0) else CONFIG_SCHEMA
+        )
+        if state.get("configuration_schema") != expected_config_schema:
             broken.append("CONFIGURATION_SCHEMA_MISMATCH")
         if state.get("selected_device") != selected["device"]:
             broken.append("SELECTED_DEVICE_STATE_MISMATCH")
@@ -367,7 +392,7 @@ def inspect(root: Path | None = None, *, system_checks: bool = True) -> dict[str
             "local_changes": changed,
         }
     unknown = [row for row in changed if row["classification"] == "UNKNOWN_LOCAL_MODIFICATION"]
-    return {
+    result = {
         "status": "MODIFIED" if unknown else "HEALTHY",
         "installed_version": state["installed_version"],
         "configuration_schema": state.get("configuration_schema"),
@@ -377,6 +402,11 @@ def inspect(root: Path | None = None, *, system_checks: bool = True) -> dict[str
         "local_changes": changed,
         "rollback": state.get("rollback", {"available": False}),
         "power_state_actions": "none",
+        "ordinary_suspend_support": "SUPPORTED",
+        "plain_hibernate_support": "SUPPORTED_ON_REFERENCE_PLATFORM",
+        "suspend_then_hibernate_status": "NOT_ENABLED_NOT_ACCEPTED",
+        "hybrid_sleep_status": "NOT_ENABLED_NOT_ACCEPTED",
+        "rollback_available": bool(state.get("rollback", {}).get("available")),
         "checks": {
             "installed_file_ownership": "PASS",
             "configuration_schema_and_identity": "PASS",
@@ -392,11 +422,30 @@ def inspect(root: Path | None = None, *, system_checks: bool = True) -> dict[str
             else "NOT_AVAILABLE",
         },
     }
+    return result
 
 
 def health_check() -> tuple[dict[str, Any], int]:
     result = inspect()
-    return result, EXIT_STATUS[result["status"]]
+    if result.get("status") in {"HEALTHY", "MODIFIED"}:
+        if _root() == Path("/"):
+            from . import hibernate
+
+            result["hibernate"] = hibernate.readiness()
+        else:
+            result["hibernate"] = {
+                "HIBERNATE_SUPPORT_STATUS": "SUPPORTED_ON_REFERENCE_PLATFORM",
+                "HIBERNATE_READY": "NOT_EVALUATED_ISOLATED_ROOT",
+                "power_state_actions": "none",
+            }
+    status = EXIT_STATUS[result["status"]]
+    if (
+        result.get("hibernate", {}).get("HIBERNATE_SUPPORT_STATUS")
+        == "SUPPORTED_ON_REFERENCE_PLATFORM"
+        and result.get("hibernate", {}).get("HIBERNATE_READY") == "FAIL"
+    ):
+        status = 8
+    return result, status
 
 
 def _parse_version(value: str) -> tuple[int, int, int]:
@@ -690,6 +739,24 @@ def rollback() -> dict[str, Any]:
                 if sha256(source) != file_meta["sha256"]:
                     raise MaintenanceError(f"rollback snapshot hash mismatch: {logical}")
                 transaction.copy(source, target(Path(logical), base), int(file_meta["mode"]))
+                restored.append(logical)
+            qualification_files = record.get("accepted_qualification_files", {})
+            if not isinstance(qualification_files, dict):
+                raise MaintenanceError("rollback qualification metadata is malformed")
+            for logical, file_meta in qualification_files.items():
+                logical_path = Path(logical) if isinstance(logical, str) else Path(".")
+                if logical_path not in ACCEPTED_QUALIFICATION_PATHS or not isinstance(
+                    file_meta, dict
+                ):
+                    raise MaintenanceError("rollback qualification path is not allowlisted")
+                mode = file_meta.get("mode")
+                expected = file_meta.get("sha256")
+                if mode not in {0o644, 0o755} or not isinstance(expected, str):
+                    raise MaintenanceError("rollback qualification metadata is invalid")
+                source = generation / "qualification-root" / logical_path.relative_to("/")
+                if not source.is_file() or source.is_symlink() or sha256(source) != expected:
+                    raise MaintenanceError(f"rollback qualification hash mismatch: {logical}")
+                transaction.copy(source, target(logical_path, base), int(mode))
                 restored.append(logical)
             timeshift_transition = bool(current.get("timeshift_integration")) and not bool(
                 previous.get("timeshift_integration")

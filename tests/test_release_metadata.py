@@ -26,18 +26,29 @@ class ReleaseMetadataTests(unittest.TestCase):
                 {
                     "product": validate_release.PROJECT,
                     "version": validate_release.VERSION,
-                    "release_date": "2026-09-08",
+                    "release_date": "2026-09-09",
                     "minimum_upgrader_schema": 1,
                     "upgrader_schema": 2,
-                    "config_schema": 1,
+                    "config_schema": 2,
                     "state_schema": 1,
-                    "migration_schema": 1,
-                    "systemd_wiring_revision": 1,
+                    "migration_schema": 2,
+                    "systemd_wiring_revision": 2,
                     "udev_rule_revision": 1,
                     "supported_upgrade_from": [">=1.0.0,<1.2.0"],
                     "supported_downgrade_from": [],
-                    "migration_ids": ["bootstrap-public-v1.0.0-to-installed-state-v1"],
+                    "migration_ids": [
+                        "bootstrap-public-v1.0.0-to-installed-state-v1",
+                        "upgrader-schema-1-to-2",
+                        "config-schema-1-to-2-hibernate-policy",
+                        "wiring-revision-1-to-2-plain-hibernate",
+                        "adopt-accepted-reference-hibernate-qualification-v1",
+                    ],
                     "assets": {"asset.run": digest},
+                    "hibernate": {
+                        "plain": "SUPPORTED_ON_REFERENCE_PLATFORM",
+                        "suspend_then_hibernate": "NOT_ENABLED_NOT_ACCEPTED",
+                        "hybrid_sleep": "NOT_ENABLED_NOT_ACCEPTED",
+                    },
                 }
             )
             + "\n"
@@ -46,7 +57,7 @@ class ReleaseMetadataTests(unittest.TestCase):
 
     def test_consistent_release_metadata_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            result = validate_release.validate(self.fixture(Path(temporary)), "v1.1.1")
+            result = validate_release.validate(self.fixture(Path(temporary)), "v1.2.0")
         self.assertEqual(result["status"], "PASS")
 
     def test_asset_and_metadata_mismatch_fails(self) -> None:

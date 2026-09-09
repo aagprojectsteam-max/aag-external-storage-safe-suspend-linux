@@ -8,6 +8,7 @@ check:
 
 release-check: check
 	$(PYTHON) scripts/privacy_scan.py --root .
+	$(PYTHON) scripts/repository_scan.py --history
 	$(PYTHON) scripts/build_release.py --check-only
 
 build: release-check

@@ -1,0 +1,12 @@
+[Unit]
+Description=Terminal storage and session-independent checks after plain Hibernate
+Documentation=https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux
+Requires=aag-external-storage-safe-hibernate-wwan.service
+After=systemd-hibernate.service aag-external-storage-safe-hibernate-wwan.service
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemd-inhibit --what=sleep:shutdown --who=AAG-safe-Hibernate --why=Complete-terminal-post-Hibernate-audit --mode=block /usr/local/libexec/aag-safe-suspend hibernate-post-check
+TimeoutStartSec=7min
+TimeoutStopSec=10s

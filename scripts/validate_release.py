@@ -32,6 +32,7 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         "migration_ids",
         "assets",
         "release_date",
+        "hibernate",
     }
     missing = sorted(required - set(manifest))
     if missing:
@@ -46,8 +47,30 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         raise RuntimeError(f"tag {expected_tag} does not match v{VERSION}")
     if manifest["minimum_upgrader_schema"] > manifest["upgrader_schema"]:
         raise RuntimeError("minimum upgrader schema exceeds release upgrader schema")
+    if (
+        manifest["config_schema"] != 2
+        or manifest["migration_schema"] != 2
+        or manifest["systemd_wiring_revision"] != 2
+    ):
+        raise RuntimeError("v1.2.0 schema or wiring metadata is inconsistent")
     if ">=1.0.0,<1.2.0" not in manifest["supported_upgrade_from"]:
         raise RuntimeError("public v1.0.0 bootstrap compatibility is not declared")
+    required_migrations = {
+        "bootstrap-public-v1.0.0-to-installed-state-v1",
+        "upgrader-schema-1-to-2",
+        "config-schema-1-to-2-hibernate-policy",
+        "wiring-revision-1-to-2-plain-hibernate",
+        "adopt-accepted-reference-hibernate-qualification-v1",
+    }
+    if not required_migrations.issubset(set(manifest["migration_ids"])):
+        raise RuntimeError("release manifest omits a required supported migration")
+    hibernate = manifest["hibernate"]
+    if hibernate != {
+        "plain": "SUPPORTED_ON_REFERENCE_PLATFORM",
+        "suspend_then_hibernate": "NOT_ENABLED_NOT_ACCEPTED",
+        "hybrid_sleep": "NOT_ENABLED_NOT_ACCEPTED",
+    }:
+        raise RuntimeError("Hibernate support scope is inconsistent")
     assets = manifest["assets"]
     if not isinstance(assets, dict) or not assets:
         raise RuntimeError("release assets are missing")
@@ -68,6 +91,8 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         "version": VERSION,
         "assets": len(assets),
         "upgrade_from_v1_0_0": True,
+        "upgrade_from_v1_1_1": True,
+        "plain_hibernate": "SUPPORTED_ON_REFERENCE_PLATFORM",
     }
 
 

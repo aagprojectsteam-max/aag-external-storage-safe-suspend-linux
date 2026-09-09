@@ -467,6 +467,13 @@ def _lid_state() -> str:
 
 def recover() -> int:
     require_root()
+    # A Hibernate dependency failure is owned by the mode-specific abort unit.
+    # Do not enter the ordinary closed-lid/hot-bag loop for that transaction.
+    from . import hibernate
+
+    if hibernate.transaction_active():
+        log("HIBERNATE_ABORT_OWNER_ACTIVE: ordinary suspend failure policy suppressed")
+        return 0
     config = load_config()
     with state.lock():
         if state.load().get("state") == "IDLE":

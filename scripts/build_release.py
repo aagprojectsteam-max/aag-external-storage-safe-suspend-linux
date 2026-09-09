@@ -14,9 +14,9 @@ import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.1.1"
+VERSION = "1.2.0"
 PROJECT = "aag-external-storage-safe-suspend-linux"
-EPOCH = 1788825600  # 2026-09-08T00:00:00Z
+EPOCH = 1788912000  # 2026-09-09T00:00:00Z
 EXCLUDES = {
     ".git",
     ".mypy_cache",
@@ -142,21 +142,29 @@ def build() -> dict[str, object]:
     release_manifest = {
         "product": PROJECT,
         "version": VERSION,
-        "release_date": "2026-09-08",
+        "release_date": "2026-09-09",
         "source_date_epoch": EPOCH,
         "minimum_upgrader_schema": 1,
         "upgrader_schema": 2,
-        "config_schema": 1,
+        "config_schema": 2,
         "state_schema": 1,
-        "migration_schema": 1,
-        "systemd_wiring_revision": 1,
+        "migration_schema": 2,
+        "systemd_wiring_revision": 2,
         "udev_rule_revision": 1,
         "supported_upgrade_from": [">=1.0.0,<1.2.0"],
         "supported_downgrade_from": [],
         "migration_ids": [
             "bootstrap-public-v1.0.0-to-installed-state-v1",
             "upgrader-schema-1-to-2",
+            "config-schema-1-to-2-hibernate-policy",
+            "wiring-revision-1-to-2-plain-hibernate",
+            "adopt-accepted-reference-hibernate-qualification-v1",
         ],
+        "hibernate": {
+            "plain": "SUPPORTED_ON_REFERENCE_PLATFORM",
+            "suspend_then_hibernate": "NOT_ENABLED_NOT_ACCEPTED",
+            "hybrid_sleep": "NOT_ENABLED_NOT_ACCEPTED",
+        },
         "assets": assets,
         "public_file_count": len(file_hashes),
         "power_state_actions": "none",

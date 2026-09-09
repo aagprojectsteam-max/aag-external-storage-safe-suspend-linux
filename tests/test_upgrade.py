@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import signal
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -58,6 +59,15 @@ class UpgradeTests(unittest.TestCase):
             return ROOT / "tests/fixtures/v1.0.0/cli.py"
         if logical.endswith("/job_guard.py"):
             return ROOT / "tests/fixtures/v1.0.0/job_guard.py"
+        if logical.endswith(("/config.py", "/coordinator.py")):
+            name = Path(logical).name
+            fixture = self.root / f".public-v1-{name}"
+            fixture.write_bytes(
+                subprocess.check_output(
+                    ["git", "show", f"v1.0.0:src/aag_safe_suspend/{name}"], cwd=ROOT
+                )
+            )
+            return fixture
         for destination, (source, _mode) in INSTALLER.FILES.items():
             if destination == target:
                 return source
@@ -95,14 +105,17 @@ class UpgradeTests(unittest.TestCase):
             destination.chmod(mode)
             self.assertEqual(INSTALLER.sha256(destination), expected)
             files[logical] = {"sha256": expected, "mode": mode}
-        configuration = config.load(ROOT / "tests/fixtures/config.json")
+        configuration = json.loads((ROOT / "tests/fixtures/config.json").read_text())
+        configuration["version"] = 1
+        configuration.pop("hibernate", None)
+        normalized = config.validate(configuration)
         config_path = self.logical(INSTALLER.CONFIG_PATH)
         config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(config.dump(configuration))
+        config_path.write_text(json.dumps(configuration, indent=2, sort_keys=True) + "\n")
         config_path.chmod(0o600)
         rule_path = self.logical(INSTALLER.RULE_PATH)
         rule_path.parent.mkdir(parents=True, exist_ok=True)
-        rule_path.write_text(identity.udev_rule(configuration, INSTALLER.MARKER_PATH))
+        rule_path.write_text(identity.udev_rule(normalized, INSTALLER.MARKER_PATH))
         rule_path.chmod(0o644)
         for logical, path in (
             (str(INSTALLER.CONFIG_PATH), config_path),
@@ -129,6 +142,34 @@ class UpgradeTests(unittest.TestCase):
     def install_fresh(self) -> dict[str, object]:
         return INSTALLER.Installer(self.root, True).install(self.fresh_args)
 
+    def make_v111(self) -> dict[str, object]:
+        """Create a sanitized managed v1.1.1 root without shipping an old binary asset."""
+        state_value = self.install_fresh()
+        state_path = self.logical(INSTALLER.INSTALL_STATE)
+        state_value = json.loads(state_path.read_text())
+        hibernate_paths = [
+            logical for logical in list(state_value["files"]) if "hibernate" in logical.lower()
+        ]
+        for logical in hibernate_paths:
+            self.logical(logical).unlink()
+            del state_value["files"][logical]
+        config_path = self.logical(INSTALLER.CONFIG_PATH)
+        old_config = json.loads(config_path.read_text())
+        old_config["version"] = 1
+        old_config.pop("hibernate", None)
+        config_path.write_text(json.dumps(old_config, indent=2, sort_keys=True) + "\n")
+        state_value["files"][str(INSTALLER.CONFIG_PATH)]["sha256"] = INSTALLER.sha256(config_path)
+        state_value.update(
+            installed_version="1.1.1",
+            configuration_schema=1,
+            migration_schema=1,
+            systemd_wiring_revision=1,
+        )
+        state_value["release"]["tag"] = "v1.1.1"
+        state_path.write_text(json.dumps(state_value, indent=2, sort_keys=True) + "\n")
+        state_path.chmod(0o600)
+        return state_value
+
     def environment(self):
         return patch.dict(
             os.environ,
@@ -141,7 +182,7 @@ class UpgradeTests(unittest.TestCase):
             self.logical("/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/cli.py")
         )
         result = INSTALLER.Installer(self.root, True).install(self.args)
-        self.assertEqual(result["installed_version"], "1.1.1")
+        self.assertEqual(result["installed_version"], "1.2.0")
         self.assertIn("bootstrap-public-v1.0.0-to-installed-state-v1", result["migrations_applied"])
         self.assertFalse(self.logical(INSTALLER.LEGACY_STATE).exists())
         with self.environment():
@@ -153,6 +194,83 @@ class UpgradeTests(unittest.TestCase):
             ),
             old_hash,
         )
+
+    def test_v1_1_1_to_v1_2_0_transaction_and_exact_rollback(self) -> None:
+        self.make_v111()
+        old_config = self.logical(INSTALLER.CONFIG_PATH).read_bytes()
+        result = INSTALLER.Installer(self.root, True).install(self.args)
+        self.assertEqual(result["installed_version"], "1.2.0")
+        self.assertIn("config-schema-1-to-2-hibernate-policy", result["migrations_applied"])
+        self.assertIn("wiring-revision-1-to-2-plain-hibernate", result["migrations_applied"])
+        self.assertEqual(json.loads(self.logical(INSTALLER.CONFIG_PATH).read_text())["version"], 2)
+        with self.environment():
+            rolled_back = maintenance.rollback()
+        self.assertEqual(rolled_back["to_version"], "1.1.1")
+        self.assertEqual(self.logical(INSTALLER.CONFIG_PATH).read_bytes(), old_config)
+        self.assertFalse(
+            self.logical(
+                "/etc/systemd/system/systemd-hibernate.service.d/70-aag-external-storage-safe-hibernate.conf"
+            ).exists()
+        )
+
+    def test_v1_1_1_upgrade_failure_automatically_restores_prior_tree(self) -> None:
+        self.make_v111()
+        old_state = self.logical(INSTALLER.INSTALL_STATE).read_bytes()
+        installer = INSTALLER.Installer(self.root, True)
+        with (
+            patch.object(
+                installer, "validate_installed", side_effect=INSTALLER.InstallError("injected")
+            ),
+            self.assertRaises(INSTALLER.InstallError),
+        ):
+            installer.install(self.args)
+        self.assertEqual(self.logical(INSTALLER.INSTALL_STATE).read_bytes(), old_state)
+        self.assertTrue((installer.transaction / "INSTALL-ABORTED.txt").is_file())
+
+    def qualification_fixture(self) -> tuple[dict[str, tuple[str, int]], dict[str, bytes]]:
+        fixture: dict[str, tuple[str, int]] = {}
+        contents: dict[str, bytes] = {}
+        for index, logical in enumerate(INSTALLER.ACCEPTED_QUALIFICATION_V1):
+            path = self.logical(logical)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            content = f"synthetic-qualified-component-{index}\n".encode()
+            path.write_bytes(content)
+            mode = 0o755 if logical.startswith("/usr/") else 0o644
+            path.chmod(mode)
+            fixture[logical] = (INSTALLER.sha256(path), mode)
+            contents[logical] = content
+        return fixture, contents
+
+    def test_accepted_qualification_is_adopted_and_exactly_rollbackable(self) -> None:
+        self.make_v111()
+        fixture, contents = self.qualification_fixture()
+        with patch.object(INSTALLER, "ACCEPTED_QUALIFICATION_V1", fixture):
+            result = INSTALLER.Installer(self.root, True).install(self.args)
+        self.assertIn(
+            "adopt-accepted-reference-hibernate-qualification-v1",
+            result["migrations_applied"],
+        )
+        migrated_config = json.loads(self.logical(INSTALLER.CONFIG_PATH).read_text())
+        self.assertTrue(migrated_config["hibernate"]["enabled"])
+        self.assertTrue(migrated_config["hibernate"]["t700"]["enabled"])
+        for logical in fixture:
+            self.assertFalse(self.logical(logical).exists())
+        with self.environment():
+            rolled_back = maintenance.rollback()
+        self.assertEqual(rolled_back["to_version"], "1.1.1")
+        for logical, content in contents.items():
+            self.assertEqual(self.logical(logical).read_bytes(), content)
+
+    def test_partial_qualification_payload_refuses_before_mutation(self) -> None:
+        self.make_v111()
+        logical = next(iter(INSTALLER.ACCEPTED_QUALIFICATION_V1))
+        path = self.logical(logical)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("partial\n")
+        before = self.logical(INSTALLER.INSTALL_STATE).read_bytes()
+        with self.assertRaisesRegex(INSTALLER.InstallError, "partial accepted Hibernate"):
+            INSTALLER.Installer(self.root, True).install(self.args)
+        self.assertEqual(self.logical(INSTALLER.INSTALL_STATE).read_bytes(), before)
 
     def test_upgrade_never_touches_user_backup_or_project_data(self) -> None:
         self.make_legacy()
@@ -225,10 +343,12 @@ class UpgradeTests(unittest.TestCase):
         path = self.logical(INSTALLER.CONFIG_PATH)
         value = json.loads(path.read_text())
         value["thermal"]["warning_grace_seconds"] = 61
-        custom = json.dumps(value, indent=4, sort_keys=False) + "\n"
-        path.write_text(custom)
+        path.write_text(json.dumps(value, indent=4, sort_keys=False) + "\n")
         result = INSTALLER.Installer(self.root, True).install(self.args)
-        self.assertEqual(path.read_text(), custom)
+        migrated = json.loads(path.read_text())
+        self.assertEqual(migrated["version"], 2)
+        self.assertEqual(migrated["thermal"]["warning_grace_seconds"], 61)
+        self.assertFalse(migrated["hibernate"]["enabled"])
         self.assertEqual(
             self.logical(INSTALLER.RULE_PATH).read_text(),
             identity.udev_rule(config.load(path), INSTALLER.MARKER_PATH),
@@ -248,7 +368,7 @@ class UpgradeTests(unittest.TestCase):
         unit.write_text("corrupt\n")
         repair_args = argparse.Namespace(**{**vars(self.args), "repair": True})
         result = INSTALLER.Installer(self.root, True).install(repair_args)
-        self.assertEqual(result["installed_version"], "1.1.1")
+        self.assertEqual(result["installed_version"], "1.2.0")
         self.assertEqual(config_path.read_text(), custom)
         self.assertNotEqual(unit.read_text(), "corrupt\n")
 
@@ -277,6 +397,18 @@ class UpgradeTests(unittest.TestCase):
             self.assertEqual(
                 maintenance.inspect(self.root, system_checks=False)["status"], "BROKEN"
             )
+
+    def test_status_and_health_expose_scoped_hibernate_support(self) -> None:
+        self.install_fresh()
+        with self.environment():
+            status = maintenance.inspect(self.root, system_checks=False)
+            health, exit_status = maintenance.health_check()
+        self.assertEqual(status["ordinary_suspend_support"], "SUPPORTED")
+        self.assertEqual(status["plain_hibernate_support"], "SUPPORTED_ON_REFERENCE_PLATFORM")
+        self.assertEqual(status["suspend_then_hibernate_status"], "NOT_ENABLED_NOT_ACCEPTED")
+        self.assertEqual(status["hybrid_sleep_status"], "NOT_ENABLED_NOT_ACCEPTED")
+        self.assertEqual(exit_status, 0)
+        self.assertEqual(health["hibernate"]["HIBERNATE_READY"], "NOT_EVALUATED_ISOLATED_ROOT")
 
     def test_pending_states_are_reported(self) -> None:
         state = self.install_fresh()

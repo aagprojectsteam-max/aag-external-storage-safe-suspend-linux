@@ -12,7 +12,10 @@ not mount protected internal storage differently, bypass target identity,
 remove the transaction marker, force-unmount, issue generic process signals, or
 initiate power-state actions.
 
-The accepted reference machine also verified coexistence with a separate modem
-and GNSS policy. That code and its private evidence are intentionally out of
-scope. This repository provides only the generic argv interface and makes no
-support claim for a particular modem.
+The plain-Hibernate reference profile adds a separate, explicit T700 boundary.
+It verifies generic PCI vendor/device and driver identity, waits for stable
+MBIM and WWAN nodes, performs one configured absolute-argv recovery action (or
+the built-in single ModemManager recovery), then requires both ModemManager
+enumeration and NetworkManager connectivity. It never starts GNSS. Subscriber,
+modem, profile, serial, and raw evidence identities remain outside the public
+tree; support is limited to the tested reference platform.

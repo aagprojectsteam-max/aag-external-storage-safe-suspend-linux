@@ -7,10 +7,17 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from aag_safe_suspend import config, coordinator, thermal
+from aag_safe_suspend import config, coordinator, hibernate, thermal
 
 
 class PolicyTests(unittest.TestCase):
+    def test_hibernate_transaction_has_one_mode_specific_abort_owner(self) -> None:
+        with (
+            patch.object(coordinator, "TEST_MODE", True),
+            patch.object(hibernate, "transaction_active", return_value=True),
+        ):
+            self.assertEqual(coordinator.recover(), 0)
+
     def test_progress_aware_wait_has_no_universal_short_deadline(self) -> None:
         policy = {
             "soft_wait_seconds": 120,

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -12,7 +13,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.1.1"
+VERSION = "1.2.0"
 
 
 def sha256(path: Path) -> str:
@@ -92,6 +93,21 @@ def main() -> int:
         )
         if status.returncode or '"status": "HEALTHY"' not in status.stdout:
             raise RuntimeError("stable installed status command failed")
+        if '"plain_hibernate_support": "SUPPORTED_ON_REFERENCE_PLATFORM"' not in status.stdout:
+            raise RuntimeError("installed status omitted scoped plain-Hibernate support")
+        health = subprocess.run(
+            [str(root / "usr/local/bin/aag-safe-suspend"), "health-check"],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=30,
+            env=cli_env,
+        )
+        if (
+            health.returncode
+            or '"HIBERNATE_READY": "NOT_EVALUATED_ISOLATED_ROOT"' not in health.stdout
+        ):
+            raise RuntimeError("non-destructive Hibernate health surface failed")
         same = run(common + ["install"])
         if '"result": "SAME_VERSION"' not in same.stdout:
             raise RuntimeError("release installer did not detect a same-version invocation")
@@ -102,6 +118,64 @@ def main() -> int:
             raise RuntimeError("release asset left a project executable after uninstall")
         if (root / "etc/aag-external-storage-safe-suspend").exists():
             raise RuntimeError("release asset left an empty project configuration directory")
+
+        # Build a sanitized managed v1.1.1 fixture from the just-verified
+        # payload, then prove the complete asset upgrade and deliberate
+        # rollback path without embedding or downloading an old executable.
+        upgrade_root = Path(temporary) / "upgrade-root"
+        (upgrade_root / "usr/bin").mkdir(parents=True)
+        shutil.copy2("/bin/true", upgrade_root / "usr/bin/timeshift")
+        shutil.copy2("/bin/true", upgrade_root / "usr/bin/timeshift-gtk")
+        upgrade_common = [str(asset), "--root", str(upgrade_root), "--test-mode"]
+        run(
+            upgrade_common
+            + ["install", "--config", str(ROOT / "tests/fixtures/config.json"), "--timeshift"]
+        )
+        upgrade_state_path = (
+            upgrade_root / "var/lib/aag-external-storage-safe-suspend/install-state.json"
+        )
+        upgrade_state = json.loads(upgrade_state_path.read_text())
+        for logical in list(upgrade_state["files"]):
+            if "hibernate" not in logical.lower():
+                continue
+            (upgrade_root / logical.removeprefix("/")).unlink()
+            del upgrade_state["files"][logical]
+        config_path = upgrade_root / "etc/aag-external-storage-safe-suspend/config.json"
+        old_config = json.loads(config_path.read_text())
+        old_config["version"] = 1
+        old_config.pop("hibernate", None)
+        config_path.write_text(json.dumps(old_config, sort_keys=True, indent=2) + "\n")
+        upgrade_state["files"]["/etc/aag-external-storage-safe-suspend/config.json"]["sha256"] = (
+            sha256(config_path)
+        )
+        upgrade_state.update(
+            installed_version="1.1.1",
+            configuration_schema=1,
+            migration_schema=1,
+            systemd_wiring_revision=1,
+        )
+        upgrade_state["release"]["tag"] = "v1.1.1"
+        upgrade_state_path.write_text(json.dumps(upgrade_state, sort_keys=True, indent=2) + "\n")
+        upgrade_state_path.chmod(0o600)
+        upgraded = run(upgrade_common + ["install"])
+        if '"installed_version": "1.2.0"' not in upgraded.stdout:
+            raise RuntimeError("v1.1.1 fixture did not upgrade to v1.2.0")
+        upgrade_env = {
+            **os.environ,
+            "AAG_SAFE_SUSPEND_ROOT": str(upgrade_root),
+            "AAG_SAFE_SUSPEND_TEST_MODE": "1",
+        }
+        rolled_back = subprocess.run(
+            [str(upgrade_root / "usr/local/bin/aag-safe-suspend"), "rollback"],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=30,
+            env=upgrade_env,
+        )
+        if rolled_back.returncode or '"to_version": "1.1.1"' not in rolled_back.stdout:
+            raise RuntimeError("v1.2.0 rollback did not restore v1.1.1")
+        run(upgrade_common + ["uninstall"])
 
         corrupt = Path(temporary) / "corrupt.run"
         data = bytearray(asset.read_bytes())
@@ -115,6 +189,7 @@ def main() -> int:
     print("SELF_EXTRACT_CHECKSUM=PASS")
     print("RELEASE_INSTALLER_TEST=PASS")
     print("RELEASE_ROLLBACK_TEST=PASS")
+    print("UPGRADE_1_1_1_TO_1_2_0=PASS")
     print("POWER_STATE_ACTIONS=NONE")
     return 0
 

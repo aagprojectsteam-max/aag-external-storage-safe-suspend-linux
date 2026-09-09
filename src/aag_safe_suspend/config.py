@@ -37,8 +37,8 @@ def _command(value: object, field: str) -> list[str]:
 
 
 def validate(raw: dict[str, Any]) -> dict[str, Any]:
-    if not isinstance(raw, dict) or raw.get("version") != 1:
-        raise ConfigError("configuration version must be 1")
+    if not isinstance(raw, dict) or raw.get("version") not in {1, 2}:
+        raise ConfigError("configuration version must be 1 or 2")
     device = raw.get("device")
     if not isinstance(device, dict):
         raise ConfigError("device section is required")
@@ -124,8 +124,38 @@ def validate(raw: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(integration, dict):
         raise ConfigError("integration must be an object")
 
+    hibernate = raw.get("hibernate", {})
+    if not isinstance(hibernate, dict):
+        raise ConfigError("hibernate must be an object")
+    hibernate_enabled = hibernate.get("enabled", False)
+    if not isinstance(hibernate_enabled, bool):
+        raise ConfigError("hibernate.enabled must be boolean")
+    swap_file = _absolute_path(hibernate.get("swap_file", "/swap.img"), "hibernate.swap_file")
+    t700 = hibernate.get("t700", {})
+    if not isinstance(t700, dict):
+        raise ConfigError("hibernate.t700 must be an object")
+    t700_enabled = t700.get("enabled", False)
+    if not isinstance(t700_enabled, bool):
+        raise ConfigError("hibernate.t700.enabled must be boolean")
+    pci_vendor = str(t700.get("pci_vendor", "14c3")).lower().removeprefix("0x")
+    pci_device = str(t700.get("pci_device", "4d75")).lower().removeprefix("0x")
+    if not HEX_ID.fullmatch(pci_vendor) or not HEX_ID.fullmatch(pci_device):
+        raise ConfigError("hibernate T700 PCI IDs must be four hex digits")
+    settle = int(t700.get("settle_seconds", 110))
+    stable = int(t700.get("stable_seconds", 10))
+    stability_timeout = int(t700.get("stability_timeout_seconds", 30))
+    recovery_timeout = int(t700.get("recovery_timeout_seconds", 100))
+    modem_timeout = int(t700.get("modem_timeout_seconds", 35))
+    connect_timeout = int(t700.get("connect_timeout_seconds", 15))
+    if not (30 <= settle <= 300 and 5 <= stable <= 30 and stable <= stability_timeout <= 120):
+        raise ConfigError("hibernate T700 settle/stability bounds are unsafe")
+    if not (
+        30 <= recovery_timeout <= 180 and 10 <= modem_timeout <= 90 and 5 <= connect_timeout <= 60
+    ):
+        raise ConfigError("hibernate T700 recovery/connect bounds are unsafe")
+
     return {
-        "version": 1,
+        "version": 2,
         "device": {
             "serial": serial,
             "usb_vendor_id": vendor,
@@ -160,6 +190,24 @@ def validate(raw: dict[str, Any]) -> dict[str, Any]:
             "post_resume_command": _command(
                 integration.get("post_resume_command"), "integration.post_resume_command"
             ),
+        },
+        "hibernate": {
+            "enabled": hibernate_enabled,
+            "swap_file": swap_file,
+            "t700": {
+                "enabled": t700_enabled,
+                "pci_vendor": f"0x{pci_vendor}",
+                "pci_device": f"0x{pci_device}",
+                "settle_seconds": settle,
+                "stable_seconds": stable,
+                "stability_timeout_seconds": stability_timeout,
+                "recovery_timeout_seconds": recovery_timeout,
+                "modem_timeout_seconds": modem_timeout,
+                "connect_timeout_seconds": connect_timeout,
+                "recovery_command": _command(
+                    t700.get("recovery_command"), "hibernate.t700.recovery_command"
+                ),
+            },
         },
     }
 

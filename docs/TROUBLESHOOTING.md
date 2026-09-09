@@ -51,3 +51,25 @@ Uninstall requires no active fence, IDLE project state, unchanged project-owned
 files, and a clear semantic job guard. The refusal preserves the installation.
 Resolve the exact conflict rather than deleting project state or using package
 force options.
+
+## Plain Hibernate is not ready
+
+Run the non-destructive report:
+
+```bash
+sudo aag-safe-suspend health-check
+```
+
+Do not invoke Hibernate if any resume-device, resume-offset, swapfile,
+initramfs, image-capacity, memory-safety, kernel-state, T700 or UGREEN gate
+fails. The project intentionally does not repair swap, boot-loader or initramfs
+configuration automatically. Review [the Hibernate guide](HIBERNATE.md) and fix
+the actual mapping or capacity issue before trying again.
+
+## WWAN does not return after plain Hibernate
+
+Inspect the Hibernate-only recovery and resume services. The normal policy
+waits for a stable T700 device generation and invokes one bounded recovery
+action; it does not repeatedly reset the modem, PCI endpoint or driver. A
+failure remains explicit. Do not use AT commands or start GNSS as a generic
+recovery experiment. See [T700 WWAN Hibernate recovery](T700-WWAN-HIBERNATE.md).

@@ -9,8 +9,8 @@ run it directly. An existing supported installation is detected automatically;
 
 ```bash
 sha256sum --ignore-missing -c SHA256SUMS
-chmod +x aag-external-storage-safe-suspend-linux-v1.1.1.run
-sudo ./aag-external-storage-safe-suspend-linux-v1.1.1.run
+chmod +x aag-external-storage-safe-suspend-linux-v1.2.0.run
+sudo ./aag-external-storage-safe-suspend-linux-v1.2.0.run
 ```
 
 The installer reports `FRESH_INSTALL`, `SAME_VERSION`, `UPGRADE`, or a precise
@@ -32,6 +32,36 @@ aag-safe-suspend update-check
 `MODIFIED`, `PARTIAL`, `UPGRADE_PENDING`, `ROLLBACK_PENDING`, or `BROKEN`.
 Health exit statuses are respectively 2, 0, 3, 4, 5, 6, and 7. The update
 check makes one read-only HTTPS request to GitHub Releases and installs nothing.
+
+## v1.1.1 to v1.2.0
+
+The direct in-place path is supported and tested. It verifies the v1.1.1
+installed-state manifest, creates an exact rollback snapshot, migrates config
+schema 1 to 2 while preserving the selected device and existing supported
+settings, installs Hibernate-only wiring, reloads systemd and udev metadata,
+runs health checks, and commits v1.2.0 last. Failure before commit restores the
+exact v1.1.1 tree and configuration.
+
+Hibernate defaults to disabled during an ordinary migration. On the documented
+reference platform, opt in during the same transaction with:
+
+```bash
+sudo ./aag-external-storage-safe-suspend-linux-v1.2.0.run install \
+  --enable-reference-hibernate
+sudo aag-safe-suspend health-check
+```
+
+This does not initiate Hibernate. Do not enable the option on an unqualified
+platform merely because the kernel exposes `disk` in `/sys/power/state`.
+
+The accepted reference machine may also contain the final pre-release
+qualification helpers beside its public v1.1.1 installation. v1.2.0 adopts
+only the complete known final file set at exact published hashes, snapshots it
+for rollback, removes the obsolete duplicate wiring, and installs the managed
+public equivalents. Exact adoption also preserves that machine's already
+accepted plain-Hibernate and T700 policy as enabled. A partial or locally
+changed qualification set fails before mutation. Private qualification state
+and evidence directories are never read, copied, or removed.
 
 Canonical state is root-owned mode `0600` at
 `/var/lib/aag-external-storage-safe-suspend/install-state.json`; its parent is
@@ -64,8 +94,11 @@ rollback, and migrations.
 
 `/etc/aag-external-storage-safe-suspend/config.json` is
 `SUPPORTED_USER_CONFIG`. A valid local configuration is preserved byte for
-byte during an ordinary upgrade, and the target-only udev rule is regenerated
-from it. Project code, units, wrappers, and the generated rule are
+byte unless an explicitly declared schema migration is required. The v1.2.0
+schema-1-to-2 migration preserves existing supported values and adds disabled
+Hibernate defaults; exact prior bytes remain in the rollback snapshot. The
+target-only udev rule is regenerated from the validated configuration. Project
+code, units, wrappers, and the generated rule are
 `PROJECT_MANAGED`. A changed managed file is an
 `UNKNOWN_LOCAL_MODIFICATION` and blocks ordinary upgrade.
 
@@ -88,14 +121,14 @@ sudo aag-safe-suspend rollback
 Rollback is allowed only when the installed state names a hash-verified,
 schema-compatible exact previous snapshot. It is itself transactional and runs
 the same active-transaction guard. There is no arbitrary version selection.
-Running an older installer is a downgrade, never an upgrade, and v1.1.x refuses
+Running an older installer is a downgrade, never an upgrade, and v1.x refuses
 it with `DOWNGRADE_REFUSED_WITH_REASON`. A future release may declare a narrow
 supported downgrade only when config, state, wiring, and rollback migrations
 are explicitly reversible.
 
 ## First upgrade from public v1.0.0
 
-v1.1.x contains the bootstrap identities of the public v1.0.0 tag. It requires
+v1.2.0 retains the bootstrap identities of the public v1.0.0 tag. It requires
 the root-only v1.0.0 `active.json`, matches every fixed runtime, wrapper, unit,
 and drop-in against those known hashes, validates the existing configuration,
 and matches the generated rule to the v1.0.0 recorded baseline. It then creates

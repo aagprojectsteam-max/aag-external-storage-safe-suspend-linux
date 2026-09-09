@@ -25,3 +25,30 @@ Final physical acceptance on the reference platform produced:
 These are observations from one accepted reference machine. They do not claim a
 universal hardware guarantee. The public reconstruction adds only sanitized,
 synthetic fixtures; no raw private evidence is shipped.
+
+## Plain-Hibernate acceptance
+
+One separately authorized reference-platform cycle produced:
+
+| Gate | Result |
+| --- | --- |
+| Kernel Hibernate image created | PASS |
+| Complete power-off before manual power-on | PASS |
+| Resume from the image, not cold boot | PASS |
+| Existing desktop session restored | PASS |
+| Resume device, offset and swapfile identity | PASS |
+| Image capacity and corrected memory model | PASS |
+| External target cleanly released and terminally re-audited | PASS |
+| Target-only automount policy and fence return to IDLE | PASS |
+| Protected internal data identity and mount | UNCHANGED |
+| Filesystem and kernel I/O error evidence | NONE |
+| T700 stable-generation recovery correction | INSTALLED AND VERIFIED |
+| ModemManager and NetworkManager WWAN state | RECOVERED |
+| GNSS on-demand policy | UNCHANGED |
+| Ordinary-suspend effective graph | UNCHANGED |
+| Physical Hibernate cycles | 1 |
+
+The original early WWAN recovery failure remains part of the private engineering
+record. The public implementation contains the final delayed stable-generation
+correction only. Plain Hibernate is accepted on the reference platform;
+suspend-then-hibernate and hybrid sleep are not accepted.

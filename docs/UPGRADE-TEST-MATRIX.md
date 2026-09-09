@@ -8,6 +8,7 @@ operation.
 |---|---|
 | Fresh install | installer round trip and release acceptance |
 | v1.0.0 to simulated v1.0.1 / v1.1.0 | version classifier plus exact public-v1.0.0 bootstrap fixture |
+| v1.1.1 to v1.2.0 | sanitized managed-state fixture, config/wiring migrations, commit and exact rollback |
 | Same version / repair | no-op detection and transactional managed-file repair |
 | Unsupported downgrade | explicit refusal test |
 | Modified managed file / supported config / unknown legacy edit | ownership-class tests |
@@ -27,3 +28,11 @@ operation.
 deterministic build, compatibility-manifest validation, self-extractor
 corruption test, isolated install, same-version detection, and uninstall
 rollback check. CI and tag publication both require this target to pass.
+
+Hibernate additions cover valid and invalid resume device/offset, changed
+swapfile identity, missing initramfs resume support, insufficient capacity, the
+non-double-counted memory model, clean/managed/unknown external ownership,
+generation change, terminal automount, cold boot detection, delayed T700 stable
+identity, late ModemManager/NetworkManager readiness, ordinary-suspend graph
+isolation, and transactional rollback. Fixtures contain no live device identity
+or raw qualification evidence.

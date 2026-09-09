@@ -1,0 +1,11 @@
+[Unit]
+Description=Delayed stable-generation T700 recovery after plain Hibernate
+Documentation=https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux
+After=systemd-hibernate.service ModemManager.service NetworkManager.service
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/aag-safe-suspend hibernate-wwan-recover
+TimeoutStartSec=5min30s
+TimeoutStopSec=10s

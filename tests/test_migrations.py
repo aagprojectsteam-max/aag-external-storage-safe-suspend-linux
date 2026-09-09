@@ -22,12 +22,16 @@ class MigrationTests(unittest.TestCase):
             [
                 "bootstrap-public-v1.0.0-to-installed-state-v1",
                 "upgrader-schema-1-to-2",
+                "config-schema-1-to-2-hibernate-policy",
+                "wiring-revision-1-to-2-plain-hibernate",
             ],
         )
         self.assertTrue(all(item.idempotent and item.rollback for item in plan))
         migrated = migrations.apply(active, plan)
         self.assertEqual(migrated["migration_schema"], 1)
         self.assertEqual(migrated["upgrader_schema"], 2)
+        self.assertEqual(migrated["configuration_schema"], 2)
+        self.assertEqual(migrated["systemd_wiring_revision"], 2)
         self.assertEqual(migrations.apply(migrated, plan), migrated)
 
     def test_unknown_schema_refuses(self) -> None:

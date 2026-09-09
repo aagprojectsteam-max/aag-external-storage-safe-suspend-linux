@@ -1,0 +1,13 @@
+[Unit]
+Description=One-cycle plain-Hibernate cold-boot detector
+Documentation=https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux
+ConditionPathExists=/var/lib/aag-external-storage-safe-suspend/hibernate-episode.json
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/aag-safe-suspend hibernate-boot-check
+TimeoutStartSec=30s
+
+[Install]
+WantedBy=multi-user.target
