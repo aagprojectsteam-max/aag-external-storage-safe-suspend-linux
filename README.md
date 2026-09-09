@@ -73,7 +73,8 @@ platform, not every enclosure, filesystem, desktop, kernel, or firmware. Plain
 Hibernate is separately physically accepted on that reference platform; it is
 opt-in and guarded by live resume-mapping and capacity checks.
 Each release is independently retrieved and verified after publication; the
-versioned verification record is then committed to the default branch.
+versioned verification record is then committed to the default branch. See the
+[v1.2.0 publication verification](docs/PUBLICATION-VERIFICATION-v1.2.0.md).
 
 ## Install
 
