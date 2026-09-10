@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +12,29 @@ from aag_safe_suspend import config, coordinator, hibernate, thermal
 
 
 class PolicyTests(unittest.TestCase):
+    @patch("aag_safe_suspend.coordinator.require_root", return_value=None)
+    @patch("aag_safe_suspend.coordinator.state.fail")
+    @patch("aag_safe_suspend.coordinator.state.load", return_value={"state": "IDLE"})
+    @patch("aag_safe_suspend.coordinator.state.lock", return_value=contextlib.nullcontext())
+    def test_preflight_refusal_before_fence_does_not_create_recovery_latch(
+        self, _lock, _load, fail, _root
+    ) -> None:
+        with patch.dict(os.environ, {"SERVICE_RESULT": "exit-code"}):
+            self.assertEqual(coordinator.teardown(), 0)
+        fail.assert_not_called()
+
+    @patch("aag_safe_suspend.coordinator.require_root", return_value=None)
+    @patch("aag_safe_suspend.coordinator.state.fail")
+    @patch(
+        "aag_safe_suspend.coordinator.state.load",
+        return_value={"state": "PREPARING_SLEEP"},
+    )
+    @patch("aag_safe_suspend.coordinator.state.lock", return_value=contextlib.nullcontext())
+    def test_failure_after_fence_remains_fail_closed(self, _lock, _load, fail, _root) -> None:
+        with patch.dict(os.environ, {"SERVICE_RESULT": "exit-code"}):
+            self.assertEqual(coordinator.teardown(), 0)
+        fail.assert_called_once_with("pre-suspend-service-failed", {"service_result": "exit-code"})
+
     def test_hibernate_transaction_has_one_mode_specific_abort_owner(self) -> None:
         with (
             patch.object(coordinator, "TEST_MODE", True),

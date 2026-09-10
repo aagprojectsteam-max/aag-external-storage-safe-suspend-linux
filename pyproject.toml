@@ -1,6 +1,6 @@
 [project]
 name = "aag-external-storage-safe-suspend-linux"
-version = "1.2.0"
+version = "1.2.1"
 description = "Fail-closed external storage release around Linux suspend"
 readme = "README.md"
 requires-python = ">=3.10"

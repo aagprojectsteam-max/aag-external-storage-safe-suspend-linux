@@ -14,9 +14,9 @@ import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 PROJECT = "aag-external-storage-safe-suspend-linux"
-EPOCH = 1788912000  # 2026-09-09T00:00:00Z
+EPOCH = 1788998400  # 2026-09-10T00:00:00Z
 EXCLUDES = {
     ".git",
     ".mypy_cache",
@@ -142,24 +142,30 @@ def build() -> dict[str, object]:
     release_manifest = {
         "product": PROJECT,
         "version": VERSION,
-        "release_date": "2026-09-09",
+        "release_date": "2026-09-10",
         "source_date_epoch": EPOCH,
         "minimum_upgrader_schema": 1,
         "upgrader_schema": 2,
         "config_schema": 2,
         "state_schema": 1,
-        "migration_schema": 2,
-        "systemd_wiring_revision": 2,
+        "migration_schema": 3,
+        "systemd_wiring_revision": 3,
         "udev_rule_revision": 1,
-        "supported_upgrade_from": [">=1.0.0,<1.2.0"],
+        "supported_upgrade_from": [">=1.0.0,<1.2.1"],
         "supported_downgrade_from": [],
         "migration_ids": [
             "bootstrap-public-v1.0.0-to-installed-state-v1",
             "upgrader-schema-1-to-2",
             "config-schema-1-to-2-hibernate-policy",
             "wiring-revision-1-to-2-plain-hibernate",
+            "wiring-revision-2-to-3-ordinary-usbclone-gate",
             "adopt-accepted-reference-hibernate-qualification-v1",
         ],
+        "ordinary_suspend": {
+            "usbclone_gate": "ENABLED_FAIL_CLOSED",
+            "loaded_dummy_hcd_without_bound_device": "ALLOWED",
+            "active_guest_usb_detach": "NEVER_AUTOMATIC",
+        },
         "hibernate": {
             "plain": "SUPPORTED_ON_REFERENCE_PLATFORM",
             "suspend_then_hibernate": "NOT_ENABLED_NOT_ACCEPTED",

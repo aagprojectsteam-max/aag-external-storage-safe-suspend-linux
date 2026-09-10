@@ -31,7 +31,7 @@ PROJECT = "aag-external-storage-safe-suspend"
 STATE_SCHEMA = 1
 UPGRADER_SCHEMA = 2
 CONFIG_SCHEMA = 2
-MIGRATION_SCHEMA = 2
+MIGRATION_SCHEMA = 3
 STATE_ROOT = Path("/var/lib") / PROJECT
 INSTALL_STATE = STATE_ROOT / "install-state.json"
 LOCK_PATH = STATE_ROOT / "installer.lock"
@@ -150,6 +150,7 @@ def load_install_state(root: Path | None = None) -> dict[str, Any]:
             Path("/usr/bin/timeshift"),
             Path("/usr/bin/timeshift-gtk"),
             Path("/etc/systemd/system/aag-external-storage-safe-suspend.service"),
+            Path("/etc/systemd/system/aag-external-storage-safe-ordinary-suspend.service"),
             Path("/etc/systemd/system/aag-external-storage-safe-suspend-resume.service"),
             Path("/etc/systemd/system/aag-external-storage-safe-suspend-failure.service"),
             Path(
@@ -318,6 +319,7 @@ def inspect(root: Path | None = None, *, system_checks: bool = True) -> dict[str
         except Exception as exc:
             broken.append(f"LIVE_IDENTITY_OR_PROTECTED_MOUNT_CHECK_FAILED:{exc}")
         for unit in (
+            "aag-external-storage-safe-ordinary-suspend.service",
             "aag-external-storage-safe-suspend.service",
             "aag-external-storage-safe-suspend-resume.service",
             "aag-external-storage-safe-suspend-failure.service",
@@ -341,6 +343,7 @@ def inspect(root: Path | None = None, *, system_checks: bool = True) -> dict[str
             [
                 "/usr/bin/systemd-analyze",
                 "verify",
+                "aag-external-storage-safe-ordinary-suspend.service",
                 "aag-external-storage-safe-suspend.service",
                 "aag-external-storage-safe-suspend-resume.service",
                 "aag-external-storage-safe-suspend-failure.service",
@@ -412,6 +415,7 @@ def inspect(root: Path | None = None, *, system_checks: bool = True) -> dict[str
             "configuration_schema_and_identity": "PASS",
             "udev_target_and_fence": "PASS",
             "systemd_owner_audit_resume_failure_wiring": "PASS",
+            "ordinary_usbclone_gate": "PASS",
             "timeshift_diversion_fence": "PASS"
             if state.get("timeshift_integration")
             else "NOT_CONFIGURED",

@@ -12,6 +12,12 @@ not mount protected internal storage differently, bypass target identity,
 remove the transaction marker, force-unmount, issue generic process signals, or
 initiate power-state actions.
 
+For ordinary suspend, the ConfigFS/dummy-HCD preflight completes before either
+integration boundary or the transaction fence. A refusal therefore cannot call
+a configured T700 pre-hook and cannot manufacture a new T700 review latch. The
+gate does not acknowledge or delete an existing T700 latch; preserving that
+separate verifier's fail-closed ownership is an invariant.
+
 The plain-Hibernate reference profile adds a separate, explicit T700 boundary.
 It verifies generic PCI vendor/device and driver identity, waits for stable
 MBIM and WWAN nodes, performs one configured absolute-argv recovery action (or

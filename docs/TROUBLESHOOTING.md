@@ -24,6 +24,24 @@ memory-mapped files. Do not force-unmount or kill an unknown process. Preserve
 the incident record under `/var/lib/aag-external-storage-safe-suspend/incidents`
 after sanitizing it before any public report.
 
+## Ordinary suspend is blocked by the USBClone gate
+
+`ACTIVE_USBCLONE_MASS_STORAGE_GADGET` means a ConfigFS mass-storage gadget is
+still bound to a dummy-HCD controller. Shut down the owning WinBoat/QEMU guest
+through its normal interface and verify that the guest and backing-storage
+ownership are gone. Do not write an empty string to `UDC`, remove ConfigFS
+objects, detach USB, or signal QEMU merely to make suspend pass.
+
+`ACTIVE_UNMANAGED_CONFIGFS_GADGET`,
+`ACTIVE_CONFIGFS_GADGET_OUTSIDE_PROVEN_SCOPE`, and
+`ACTIVE_DUMMY_HCD_DEVICE_WITHOUT_CONFIGFS_OWNER` are conservative refusals, not
+claims that those conditions caused the accepted regression. Loaded dummy-HCD
+controllers with no bound device are allowed.
+
+If a separate T700 integration already has a review latch, the project leaves
+it intact. Review its originating cycle and use only that subsystem's documented
+acknowledgement procedure. Never delete `blocked.json` to bypass the verifier.
+
 ## Resume fence remains armed
 
 Run:

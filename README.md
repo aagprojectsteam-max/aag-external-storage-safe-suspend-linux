@@ -10,6 +10,11 @@ external filesystems before sleep, keeps designated internal storage mounted,
 and closes the GNOME/udisks automount race after the USB bridge re-enumerates on
 resume.
 
+Version 1.2.1 also blocks ordinary suspend before any integration hook when a
+ConfigFS gadget is bound to a dummy-HCD virtual USB device. Loaded, empty
+dummy-HCD controllers remain allowed. The gate is read-only and never unbinds a
+gadget, detaches USB storage, or signals a WinBoat/QEMU guest.
+
 It is for Ubuntu desktop users whose USB-attached NVMe backup storage can
 disconnect or re-enumerate during s2idle. Suspending while backup writers,
 hidden mount-namespace users, raw block consumers, or newly automounted
@@ -21,7 +26,9 @@ backups or fix controller firmware.
 
 ```mermaid
 flowchart TD
-    A[Ordinary suspend requested] --> B[Arm backup-start fence]
+    A[Ordinary suspend requested] --> A2{Bound virtual USB device?}
+    A2 -- Yes --> X0[Fail closed before fence or T700 hook]
+    A2 -- No --> B[Arm backup-start fence]
     B --> B2[Arm target-only automount marker]
     B2 --> C{Managed backup active?}
     C -- Yes --> D[Request configured graceful quiesce]
@@ -42,6 +49,9 @@ flowchart TD
 
 - Internal mounts listed with `--protect-mount` are identity-checked and never
   unmounted.
+- The ordinary-only USBClone gate distinguishes loaded empty dummy-HCD
+  controllers from an active bound gadget. Unknown ConfigFS ownership or an
+  orphan dummy-HCD USB device also fails closed.
 - The external device is selected by underlying serial, USB bridge IDs, and the
   exact filesystem UUID set. A current `/dev/sdX` name is only an action handle
   after identity and kernel-generation checks.
@@ -72,19 +82,23 @@ See [tested hardware](docs/TESTED-HARDWARE.md) and the normalized
 platform, not every enclosure, filesystem, desktop, kernel, or firmware. Plain
 Hibernate is separately physically accepted on that reference platform; it is
 opt-in and guarded by live resume-mapping and capacity checks.
+The v1.2.1 regression acceptance additionally recorded one 72.361356-second
+kernel s2idle cycle and 68.945860 seconds of matching hardware and PMC
+residency, with the USBClone gate, UGREEN terminal state, internal storage,
+T700 verification, and user-session continuation all passing.
 Each release is independently retrieved and verified after publication; the
 versioned verification record is then committed to the default branch. See the
 [v1.2.0 publication verification](docs/PUBLICATION-VERIFICATION-v1.2.0.md).
 
 ## Install
 
-Download `aag-external-storage-safe-suspend-linux-v1.2.0.run`, `SHA256SUMS`,
-and `release-manifest.json` from the [v1.2.0 release], then verify before running:
+Download `aag-external-storage-safe-suspend-linux-v1.2.1.run`, `SHA256SUMS`,
+and `release-manifest.json` from the [v1.2.1 release], then verify before running:
 
 ```bash
 sha256sum --ignore-missing -c SHA256SUMS
-chmod +x aag-external-storage-safe-suspend-linux-v1.2.0.run
-sudo ./aag-external-storage-safe-suspend-linux-v1.2.0.run install \
+chmod +x aag-external-storage-safe-suspend-linux-v1.2.1.run
+sudo ./aag-external-storage-safe-suspend-linux-v1.2.1.run install \
   --device /dev/disk/by-id/your-external-backup-disk \
   --protect-mount /mnt/data \
   --timeshift
@@ -128,7 +142,7 @@ not the normal suspend path. See [the safety model](docs/SAFETY-MODEL.md).
 Use the same verified release asset:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.2.0.run uninstall
+sudo ./aag-external-storage-safe-suspend-linux-v1.2.1.run uninstall
 ```
 
 The uninstaller refuses while the fence or a conflicting systemd job is active,
@@ -139,18 +153,18 @@ action.
 
 ## Update in place
 
-Public v1.0.0 through v1.1.1 installations can upgrade directly without
+Public v1.0.0 through v1.2.0 installations can upgrade directly without
 uninstalling. Verify
 the new release asset as above, then run it with no arguments:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.2.0.run
+sudo ./aag-external-storage-safe-suspend-linux-v1.2.1.run
 ```
 
 The installer verifies the exact v1.0.0 installation, preserves valid local
 device configuration byte for byte, snapshots the accepted state, applies only
 declared migrations, reloads systemd and udev metadata without starting a power
-operation, runs a non-destructive health check, and commits v1.2.0. Any failure
+operation, runs a non-destructive health check, and commits v1.2.1. Any failure
 before commit automatically restores the exact prior project state.
 
 On the accepted reference machine, the exact final qualification payload is
@@ -187,7 +201,7 @@ suppression, and terminal owner audit as ordinary suspend.
 Enable the reference policy during a fresh install or compatible upgrade:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.2.0.run install \
+sudo ./aag-external-storage-safe-suspend-linux-v1.2.1.run install \
   --enable-reference-hibernate
 sudo aag-safe-suspend health-check
 ```
@@ -230,7 +244,8 @@ Tested behavior and design support are deliberately different:
   rejected; unexpected systemd jobs fail the installer closed; firmware/kernel
   hangs remain outside software guarantees; Timeshift integration covers the
   diverted CLI/GTK entry points, not arbitrary direct execution of private
-  binaries.
+  binaries. Active virtual USB devices block ordinary suspend until their owner
+  shuts them down safely; the project never performs an automatic hot-unplug.
 - **Plain Hibernate:** supported and physically accepted on the reference
   platform only; opt-in readiness gates fail closed elsewhere.
 - **Suspend-then-hibernate / hybrid sleep:** not enabled and not accepted.
@@ -238,6 +253,7 @@ Tested behavior and design support are deliberately different:
   identifiers, AT commands, GNSS activation, or raw evidence are included.
 
 Further reading: [architecture](docs/ARCHITECTURE.md),
+[USBClone ordinary-suspend gate](docs/USBCLONE-ORDINARY-SUSPEND.md),
 [GNOME/udisks race](docs/GNOME-UDISKS-AUTOMOUNT.md),
 [RTL9210 behavior](docs/RTL9210.md), [Timeshift](docs/TIMESHIFT.md), and
 [troubleshooting](docs/TROUBLESHOOTING.md).
@@ -255,3 +271,4 @@ The project is licensed under the [MIT License](LICENSE). Storage-safety flaws
 should be reported privately according to [SECURITY.md](SECURITY.md).
 
 [v1.2.0 release]: https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/releases/tag/v1.2.0
+[v1.2.1 release]: https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/releases/tag/v1.2.1

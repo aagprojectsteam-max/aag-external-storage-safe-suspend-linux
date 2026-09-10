@@ -63,6 +63,15 @@ CATALOG = {
         idempotent=True,
         rollback="restore-exact-prior-unit-set-and-daemon-reload",
     ),
+    "wiring-revision-2-to-3-ordinary-usbclone-gate": Migration(
+        migration_id="wiring-revision-2-to-3-ordinary-usbclone-gate",
+        domain="systemd-wiring",
+        from_schema=2,
+        to_schema=3,
+        precondition="ordinary-and-hibernate-v2-graphs-semantically-verified",
+        idempotent=True,
+        rollback="restore-exact-v2-unit-set-and-daemon-reload",
+    ),
     "adopt-accepted-reference-hibernate-qualification-v1": Migration(
         migration_id="adopt-accepted-reference-hibernate-qualification-v1",
         domain="qualification-integration",
@@ -101,7 +110,10 @@ def plan(
     wiring = active.get("systemd_wiring_revision", 1)
     if wiring == 1:
         result.append(CATALOG["wiring-revision-1-to-2-plain-hibernate"])
-    elif wiring != 2:
+        result.append(CATALOG["wiring-revision-2-to-3-ordinary-usbclone-gate"])
+    elif wiring == 2:
+        result.append(CATALOG["wiring-revision-2-to-3-ordinary-usbclone-gate"])
+    elif wiring != 3:
         raise MigrationError(f"unsupported systemd wiring revision: {wiring}")
     if accepted_qualification:
         result.append(CATALOG["adopt-accepted-reference-hibernate-qualification-v1"])

@@ -21,7 +21,14 @@ from typing import Any
 SOURCE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SOURCE / "src"))
 
-from aag_safe_suspend import __version__, identity, job_guard, maintenance, migrations
+from aag_safe_suspend import (
+    __version__,
+    identity,
+    job_guard,
+    maintenance,
+    migrations,
+    systemd_graph,
+)
 from aag_safe_suspend import config as configuration
 
 PROJECT = "aag-external-storage-safe-suspend"
@@ -37,7 +44,8 @@ PRODUCT_ID = "aag-external-storage-safe-suspend-linux"
 UPGRADER_SCHEMA = 2
 STATE_SCHEMA = 1
 CONFIG_SCHEMA = 2
-MIGRATION_SCHEMA = 2
+MIGRATION_SCHEMA = 3
+SYSTEMD_WIRING_REVISION = 3
 MAX_ROLLBACK_GENERATIONS = 3
 
 # Fixed identities from the public v1.0.0 tag.  Configuration and the generated
@@ -113,6 +121,10 @@ FILES = {
     Path("/usr/local/libexec/aag-systemd-job-guard"): (SOURCE / "src/aag-systemd-job-guard", 0o755),
     Path("/etc/systemd/system/aag-external-storage-safe-suspend.service"): (
         SOURCE / "systemd/aag-external-storage-safe-suspend.service",
+        0o644,
+    ),
+    Path("/etc/systemd/system/aag-external-storage-safe-ordinary-suspend.service"): (
+        SOURCE / "systemd/aag-external-storage-safe-ordinary-suspend.service",
         0o644,
     ),
     Path("/etc/systemd/system/aag-external-storage-safe-suspend-resume.service"): (
@@ -204,6 +216,7 @@ class Installer:
         self.rollback_generation: Path | None = None
         self.lock_stream: Any | None = None
         self.accepted_qualification: list[Path] = []
+        self.graph_before: dict[str, str] = {}
 
     def target(self, path: Path) -> Path:
         if not path.is_absolute() or ".." in path.parts or "\x00" in str(path):
@@ -253,6 +266,7 @@ class Installer:
             for unit in (
                 "systemd-suspend.service",
                 "systemd-hibernate.service",
+                "aag-external-storage-safe-ordinary-suspend.service",
                 "aag-external-storage-safe-suspend.service",
                 "aag-external-storage-safe-suspend-resume.service",
                 "aag-external-storage-safe-suspend-failure.service",
@@ -838,7 +852,25 @@ class Installer:
         command(["/usr/bin/udevadm", "control", "--reload"])
         self.guard_clear("post-udev-reload")
 
-    def validate_installed(self, config: dict[str, Any], manifest_files: dict[str, Any]) -> None:
+    def capture_power_graphs(self) -> dict[str, str]:
+        if self.test_mode:
+            return {}
+        properties = [item for name in systemd_graph.CAPTURE_PROPERTIES for item in ("-p", name)]
+        return {
+            unit: command(
+                ["/usr/bin/systemctl", "show", unit, *properties],
+                timeout=30,
+            ).stdout
+            for unit in ("systemd-suspend.service", "systemd-hibernate.service")
+        }
+
+    def validate_installed(
+        self,
+        config: dict[str, Any],
+        manifest_files: dict[str, Any],
+        active: dict[str, Any] | None,
+        operation: str,
+    ) -> None:
         for logical, metadata in manifest_files.items():
             path = self.target(Path(logical))
             info = path.lstat()
@@ -858,6 +890,7 @@ class Installer:
             return
         command(["/usr/bin/udevadm", "verify", str(RULE_PATH)])
         for unit in (
+            "aag-external-storage-safe-ordinary-suspend.service",
             "aag-external-storage-safe-suspend.service",
             "aag-external-storage-safe-suspend-resume.service",
             "aag-external-storage-safe-suspend-failure.service",
@@ -875,6 +908,7 @@ class Installer:
             [
                 "/usr/bin/systemd-analyze",
                 "verify",
+                "aag-external-storage-safe-ordinary-suspend.service",
                 "aag-external-storage-safe-suspend.service",
                 "aag-external-storage-safe-suspend-resume.service",
                 "aag-external-storage-safe-suspend-failure.service",
@@ -886,6 +920,42 @@ class Installer:
                 "systemd-hibernate.service",
             ]
         )
+        after = self.capture_power_graphs()
+        if not self.graph_before:
+            raise InstallError("pre-install systemd graph snapshot is unavailable")
+        try:
+            if operation == "SAME_VERSION_REPAIR":
+                systemd_graph.require_ordinary_contract(
+                    systemd_graph.canonical(after["systemd-suspend.service"])
+                )
+            else:
+                systemd_graph.require_ordinary_install(
+                    self.graph_before["systemd-suspend.service"],
+                    after["systemd-suspend.service"],
+                    prior_release=active is not None,
+                )
+            systemd_graph.require_hibernate_isolation(
+                systemd_graph.canonical(after["systemd-hibernate.service"])
+            )
+            prior_version = (
+                self.version_tuple(str(active.get("installed_version"))) if active else None
+            )
+            if prior_version and prior_version >= (1, 2, 0) and operation != "SAME_VERSION_REPAIR":
+                systemd_graph.require_equal(
+                    self.graph_before["systemd-hibernate.service"],
+                    after["systemd-hibernate.service"],
+                    "Hibernate",
+                )
+        except systemd_graph.GraphError as exc:
+            raise InstallError(str(exc)) from exc
+        if self.transaction:
+            for label, graphs in (("before", self.graph_before), ("after", after)):
+                normalized = {
+                    unit: systemd_graph.canonical(value) for unit, value in graphs.items()
+                }
+                (self.transaction / f"systemd-graphs-{label}.json").write_text(
+                    json.dumps(normalized, sort_keys=True, indent=2) + "\n"
+                )
         command(["/usr/local/libexec/aag-safe-suspend", "validate"])
         if config["hibernate"]["enabled"]:
             readiness = command(["/usr/local/libexec/aag-safe-suspend", "health-check"])
@@ -982,6 +1052,7 @@ class Installer:
         self.start_guard()
         try:
             self.guard_clear("pre-mutation")
+            self.graph_before = self.capture_power_graphs()
             migration_plan = migrations.plan(
                 active,
                 legacy_bootstrap=self.installation_mode == "LEGACY_BOOTSTRAP_UPGRADE",
@@ -1037,7 +1108,10 @@ class Installer:
                     }
             payload_cache = self.create_payload_cache(manifest_files)
             now = dt.datetime.now(dt.timezone.utc).isoformat()
-            migration_ids = [item.migration_id for item in migration_plan]
+            migration_ids = list((active or {}).get("migrations_applied", []))
+            for item in migration_plan:
+                if item.migration_id not in migration_ids:
+                    migration_ids.append(item.migration_id)
             manifest = {
                 "product_id": PRODUCT_ID,
                 "installed_version": __version__,
@@ -1047,7 +1121,7 @@ class Installer:
                 "state_schema": STATE_SCHEMA,
                 "configuration_schema": CONFIG_SCHEMA,
                 "migration_schema": MIGRATION_SCHEMA,
-                "systemd_wiring_revision": 2,
+                "systemd_wiring_revision": SYSTEMD_WIRING_REVISION,
                 "udev_rule_revision": 1,
                 "operation": "COMMITTED",
                 "release": {
@@ -1071,16 +1145,18 @@ class Installer:
                 "payload_cache": payload_cache,
                 "rollback": rollback,
                 "compatibility": {
-                    "upgrade_from": ">=1.0.0,<1.2.0",
+                    "upgrade_from": ">=1.0.0,<1.2.1",
                     "downgrade": "explicit-compatible-snapshot-only",
-                    "runtime_architecture": "suspend-contract-v1+plain-hibernate-reference-v1",
+                    "runtime_architecture": (
+                        "ordinary-usbclone-gate-v1+suspend-contract-v1+plain-hibernate-reference-v1"
+                    ),
                 },
                 "backup_metadata": {
                     "rollback_generations_maximum": MAX_ROLLBACK_GENERATIONS,
                     "transaction_snapshot": str(transaction),
                 },
             }
-            self.validate_installed(selected_config, manifest_files)
+            self.validate_installed(selected_config, manifest_files, active, operation)
             self.install_bytes(
                 INSTALL_STATE,
                 (json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode(),

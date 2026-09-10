@@ -1,15 +1,16 @@
 [Unit]
-Description=Release one configured external backup device before suspend
+Description=Ordinary-suspend USBClone preflight and external-storage release
 Documentation=https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux
 DefaultDependencies=no
 After=local-fs.target systemd-journald.socket
-Before=sleep.target
+Before=systemd-suspend.service sleep.target
 OnFailure=aag-external-storage-safe-suspend-failure.service
 StopWhenUnneeded=yes
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+ExecStartPre=/usr/local/libexec/aag-safe-suspend usbclone-preflight
 ExecStartPre=/usr/local/libexec/aag-safe-suspend begin
 ExecStart=/usr/local/libexec/aag-safe-suspend prepare
 ExecStopPost=-/usr/local/libexec/aag-safe-suspend teardown

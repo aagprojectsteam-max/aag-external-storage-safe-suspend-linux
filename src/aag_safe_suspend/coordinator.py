@@ -391,6 +391,11 @@ def teardown() -> int:
     require_root()
     result = os.environ.get("SERVICE_RESULT", "success")
     if result != "success":
+        with state.lock():
+            current = state.load()
+        if current.get("state") == "IDLE":
+            log("PREPARE_REFUSED_BEFORE_FENCE; no recovery latch required")
+            return 0
         state.fail("pre-suspend-service-failed", {"service_result": result})
     return 0
 

@@ -2,7 +2,7 @@
 
 ## Support statement
 
-Version 1.2.0 supports plain Hibernate on the physically verified reference
+Version 1.2.1 preserves the v1.2.0 plain-Hibernate support on the physically verified reference
 platform. This is a scoped hardware result, not a universal Linux guarantee.
 Suspend-then-hibernate and hybrid sleep remain disabled and unaccepted.
 
@@ -17,7 +17,7 @@ correction. Only normalized results and synthetic fixtures are public.
 Enable the policy only on the documented reference platform:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.2.0.run install \
+sudo ./aag-external-storage-safe-suspend-linux-v1.2.1.run install \
   --enable-reference-hibernate
 sudo aag-safe-suspend health-check
 ```
@@ -80,7 +80,7 @@ separate administrator decisions or future milestones.
 ## Transition from the accepted qualification
 
 The reference machine's final qualification payload is not copied into release
-assets. During a later explicit v1.2.0 upgrade, the installer may recognize its
+assets. During a later explicit v1.2.1 upgrade, the installer may recognize its
 complete final helper/unit set by public hashes, save those exact files in the
 bounded rollback snapshot, remove duplicate qualification wiring, and replace
 it with the generalized project-managed implementation. Any partial or changed

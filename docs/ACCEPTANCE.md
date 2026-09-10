@@ -52,3 +52,36 @@ The original early WWAN recovery failure remains part of the private engineering
 record. The public implementation contains the final delayed stable-generation
 correction only. Plain Hibernate is accepted on the reference platform;
 suspend-then-hibernate and hybrid sleep are not accepted.
+
+## Ordinary USBClone regression acceptance
+
+The accepted reference regression was reconstructed from private evidence and
+published only as normalized facts. A prior ordinary cycle with two bound
+ConfigFS/dummy-HCD mass-storage gadgets produced virtual USB resume timeouts and
+zero sustained hardware/PMC residency. The resulting T700 review latch correctly
+blocked the next ordinary attempt before kernel suspend entry. UGREEN completed
+its release and Hibernate was not part of that transaction, so neither was
+causal. Loaded empty dummy-HCD controllers were independently accepted and are
+not classified as the cause.
+
+After the ordinary-only gate and reviewed one-time latch reconciliation, the
+single final physical acceptance produced:
+
+| Gate | Result |
+| --- | --- |
+| Native systemd suspend service | SUCCESS |
+| Kernel PM entry and exit | ONE EACH |
+| Kernel s2idle interval | 72.361356 seconds |
+| Hardware low-power residency | 68.945860 seconds |
+| PMC low-power residency | 68.945860 seconds |
+| Ordinary USBClone gate | PASS |
+| UGREEN release and terminal audit | PASS |
+| Protected internal data | UNCHANGED |
+| T700 pre/resume/verifier | PASS |
+| New T700 review latch | NONE |
+| Failure/retry/poweroff path | NOT INVOKED |
+| User session | CONTINUED |
+| Cycle-attributable kernel/storage errors | NONE |
+
+Exact timestamps, boot/session identifiers, device identities, private paths,
+and raw journal evidence are intentionally not public.

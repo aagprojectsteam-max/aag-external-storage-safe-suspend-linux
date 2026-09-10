@@ -9,8 +9,8 @@ run it directly. An existing supported installation is detected automatically;
 
 ```bash
 sha256sum --ignore-missing -c SHA256SUMS
-chmod +x aag-external-storage-safe-suspend-linux-v1.2.0.run
-sudo ./aag-external-storage-safe-suspend-linux-v1.2.0.run
+chmod +x aag-external-storage-safe-suspend-linux-v1.2.1.run
+sudo ./aag-external-storage-safe-suspend-linux-v1.2.1.run
 ```
 
 The installer reports `FRESH_INSTALL`, `SAME_VERSION`, `UPGRADE`, or a precise
@@ -33,20 +33,31 @@ aag-safe-suspend update-check
 Health exit statuses are respectively 2, 0, 3, 4, 5, 6, and 7. The update
 check makes one read-only HTTPS request to GitHub Releases and installs nothing.
 
-## v1.1.1 to v1.2.0
+## v1.2.0 to v1.2.1
+
+The patch upgrade preserves configuration schema 2 and the plain-Hibernate
+contract. It transactionally replaces ordinary wiring revision 2 with revision
+3, adding the read-only USBClone-first preparation unit. The installer compares
+the effective ordinary graph to that one intended transformation and requires
+the Hibernate graph to remain semantically equal. Dependency-set ordering and
+runtime command fields are normalized; actual edges, commands, drop-ins and
+drop-in ordering remain fail-closed. Rollback restores the exact v1.2.0 files.
+
+## v1.1.1 to v1.2.1
 
 The direct in-place path is supported and tested. It verifies the v1.1.1
 installed-state manifest, creates an exact rollback snapshot, migrates config
 schema 1 to 2 while preserving the selected device and existing supported
 settings, installs Hibernate-only wiring, reloads systemd and udev metadata,
-runs health checks, and commits v1.2.0 last. Failure before commit restores the
+runs health checks, adds the ordinary USBClone gate, and commits v1.2.1 last.
+Failure before commit restores the
 exact v1.1.1 tree and configuration.
 
 Hibernate defaults to disabled during an ordinary migration. On the documented
 reference platform, opt in during the same transaction with:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.2.0.run install \
+sudo ./aag-external-storage-safe-suspend-linux-v1.2.1.run install \
   --enable-reference-hibernate
 sudo aag-safe-suspend health-check
 ```
@@ -55,7 +66,7 @@ This does not initiate Hibernate. Do not enable the option on an unqualified
 platform merely because the kernel exposes `disk` in `/sys/power/state`.
 
 The accepted reference machine may also contain the final pre-release
-qualification helpers beside its public v1.1.1 installation. v1.2.0 adopts
+qualification helpers beside its public v1.1.1 installation. v1.2.1 adopts
 only the complete known final file set at exact published hashes, snapshots it
 for rollback, removes the obsolete duplicate wiring, and installs the managed
 public equivalents. Exact adoption also preserves that machine's already
@@ -128,7 +139,7 @@ are explicitly reversible.
 
 ## First upgrade from public v1.0.0
 
-v1.2.0 retains the bootstrap identities of the public v1.0.0 tag. It requires
+v1.2.1 retains the bootstrap identities of the public v1.0.0 tag. It requires
 the root-only v1.0.0 `active.json`, matches every fixed runtime, wrapper, unit,
 and drop-in against those known hashes, validates the existing configuration,
 and matches the generated rule to the v1.0.0 recorded baseline. It then creates

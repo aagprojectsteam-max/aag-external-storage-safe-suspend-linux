@@ -60,6 +60,12 @@ class UpgradeTests(unittest.TestCase):
             return ROOT / "tests/fixtures/v1.0.0/job_guard.py"
         if logical.endswith(("/config.py", "/coordinator.py")):
             return ROOT / "tests/fixtures/v1.0.0" / Path(logical).name
+        if logical.endswith("/aag-external-storage-safe-suspend-failure.service"):
+            return ROOT / "tests/fixtures/v1.0.0/aag-external-storage-safe-suspend-failure.service"
+        if logical.endswith("/aag-external-storage-safe-suspend.service"):
+            return ROOT / "tests/fixtures/v1.0.0/aag-external-storage-safe-suspend.service"
+        if logical.endswith("/70-aag-external-storage-safe-suspend.conf"):
+            return ROOT / "tests/fixtures/v1.0.0/70-aag-external-storage-safe-suspend.conf"
         for destination, (source, _mode) in INSTALLER.FILES.items():
             if destination == target:
                 return source
@@ -174,7 +180,7 @@ class UpgradeTests(unittest.TestCase):
             self.logical("/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/cli.py")
         )
         result = INSTALLER.Installer(self.root, True).install(self.args)
-        self.assertEqual(result["installed_version"], "1.2.0")
+        self.assertEqual(result["installed_version"], "1.2.1")
         self.assertIn("bootstrap-public-v1.0.0-to-installed-state-v1", result["migrations_applied"])
         self.assertFalse(self.logical(INSTALLER.LEGACY_STATE).exists())
         with self.environment():
@@ -187,13 +193,17 @@ class UpgradeTests(unittest.TestCase):
             old_hash,
         )
 
-    def test_v1_1_1_to_v1_2_0_transaction_and_exact_rollback(self) -> None:
+    def test_v1_1_1_to_v1_2_1_transaction_and_exact_rollback(self) -> None:
         self.make_v111()
         old_config = self.logical(INSTALLER.CONFIG_PATH).read_bytes()
         result = INSTALLER.Installer(self.root, True).install(self.args)
-        self.assertEqual(result["installed_version"], "1.2.0")
+        self.assertEqual(result["installed_version"], "1.2.1")
         self.assertIn("config-schema-1-to-2-hibernate-policy", result["migrations_applied"])
         self.assertIn("wiring-revision-1-to-2-plain-hibernate", result["migrations_applied"])
+        self.assertIn(
+            "wiring-revision-2-to-3-ordinary-usbclone-gate",
+            result["migrations_applied"],
+        )
         self.assertEqual(json.loads(self.logical(INSTALLER.CONFIG_PATH).read_text())["version"], 2)
         with self.environment():
             rolled_back = maintenance.rollback()
@@ -204,6 +214,88 @@ class UpgradeTests(unittest.TestCase):
                 "/etc/systemd/system/systemd-hibernate.service.d/70-aag-external-storage-safe-hibernate.conf"
             ).exists()
         )
+
+    def test_v1_2_0_to_v1_2_1_wiring_and_exact_rollback(self) -> None:
+        state_value = self.install_fresh()
+        state_path = self.logical(INSTALLER.INSTALL_STATE)
+        state_value = json.loads(state_path.read_text())
+        old_dropin = (
+            b"[Unit]\n"
+            b"Requires=aag-external-storage-safe-suspend.service\n"
+            b"After=aag-external-storage-safe-suspend.service\n"
+            b"Wants=aag-external-storage-safe-suspend-resume.service\n"
+            b"Before=aag-external-storage-safe-suspend-resume.service\n"
+            b"OnFailure=aag-external-storage-safe-suspend-failure.service\n"
+        )
+        dropin_logical = (
+            "/etc/systemd/system/systemd-suspend.service.d/"
+            "70-aag-external-storage-safe-suspend.conf"
+        )
+        dropin = self.logical(dropin_logical)
+        dropin.write_bytes(old_dropin)
+        state_value["files"][dropin_logical]["sha256"] = INSTALLER.sha256(dropin)
+        common_service_logical = "/etc/systemd/system/aag-external-storage-safe-suspend.service"
+        common_service = self.logical(common_service_logical)
+        common_service.write_text(
+            common_service.read_text().replace(
+                "Before=sleep.target", "Before=systemd-suspend.service sleep.target"
+            )
+        )
+        state_value["files"][common_service_logical]["sha256"] = INSTALLER.sha256(common_service)
+        failure_service_logical = (
+            "/etc/systemd/system/aag-external-storage-safe-suspend-failure.service"
+        )
+        failure_service = self.logical(failure_service_logical)
+        failure_service.write_text(
+            failure_service.read_text().replace(
+                "After=systemd-suspend.service "
+                "aag-external-storage-safe-ordinary-suspend.service "
+                "aag-external-storage-safe-suspend.service",
+                "After=systemd-suspend.service aag-external-storage-safe-suspend.service",
+            )
+        )
+        state_value["files"][failure_service_logical]["sha256"] = INSTALLER.sha256(failure_service)
+        removed = (
+            "/etc/systemd/system/aag-external-storage-safe-ordinary-suspend.service",
+            "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/usbclone.py",
+            "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/systemd_graph.py",
+        )
+        for logical in removed:
+            self.logical(logical).unlink()
+            del state_value["files"][logical]
+        init_logical = "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/__init__.py"
+        init_path = self.logical(init_logical)
+        init_path.write_text(init_path.read_text().replace('"1.2.1"', '"1.2.0"'))
+        state_value["files"][init_logical]["sha256"] = INSTALLER.sha256(init_path)
+        state_value.update(
+            installed_version="1.2.0",
+            migration_schema=2,
+            systemd_wiring_revision=2,
+        )
+        state_value["migrations_applied"] = [
+            item
+            for item in state_value["migrations_applied"]
+            if item != "wiring-revision-2-to-3-ordinary-usbclone-gate"
+        ]
+        state_value["release"]["tag"] = "v1.2.0"
+        state_path.write_text(json.dumps(state_value, indent=2, sort_keys=True) + "\n")
+        state_path.chmod(0o600)
+
+        old_dropin_bytes = dropin.read_bytes()
+        result = INSTALLER.Installer(self.root, True).install(self.args)
+        self.assertEqual(result["installed_version"], "1.2.1")
+        self.assertEqual(result["systemd_wiring_revision"], 3)
+        self.assertIn(
+            "wiring-revision-2-to-3-ordinary-usbclone-gate",
+            result["migrations_applied"],
+        )
+        self.assertTrue(self.logical(removed[0]).is_file())
+        with self.environment():
+            rolled_back = maintenance.rollback()
+        self.assertEqual(rolled_back["to_version"], "1.2.0")
+        self.assertEqual(dropin.read_bytes(), old_dropin_bytes)
+        self.assertFalse(self.logical(removed[0]).exists())
+        self.assertFalse(self.logical(removed[1]).exists())
 
     def test_v1_1_1_upgrade_failure_automatically_restores_prior_tree(self) -> None:
         self.make_v111()
@@ -360,7 +452,7 @@ class UpgradeTests(unittest.TestCase):
         unit.write_text("corrupt\n")
         repair_args = argparse.Namespace(**{**vars(self.args), "repair": True})
         result = INSTALLER.Installer(self.root, True).install(repair_args)
-        self.assertEqual(result["installed_version"], "1.2.0")
+        self.assertEqual(result["installed_version"], "1.2.1")
         self.assertEqual(config_path.read_text(), custom)
         self.assertNotEqual(unit.read_text(), "corrupt\n")
 

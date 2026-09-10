@@ -3,6 +3,20 @@
 All notable changes are documented here. This project follows Semantic
 Versioning.
 
+## 1.2.1 — 2026-09-10
+
+- Add an ordinary-suspend-only, read-only gate for active ConfigFS gadgets and
+  dummy-HCD virtual USB devices before the storage fence and integration hooks.
+- Allow loaded dummy-HCD controllers when no virtual USB device is bound; never
+  hot-unplug a gadget or storage backing file from an active guest.
+- Keep pre-fence refusals at `IDLE` so a safe retry is not poisoned by a stale
+  recovery state, while preserving fail-closed handling after the fence arms.
+- Add canonical semantic systemd graph validation that treats dependency-set
+  order and runtime command fields as noise but rejects actual edge, command,
+  drop-in, or drop-in-order changes.
+- Add direct v1.2.0 upgrade and exact rollback coverage, failure cleanup,
+  idempotence, Hibernate-isolation, UGREEN-invariant, and T700-latch tests.
+
 ## 1.2.0 — 2026-09-09
 
 - Add physically accepted, reference-platform-only plain Hibernate support.

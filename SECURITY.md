@@ -3,7 +3,7 @@
 ## Supported versions
 
 Security and storage-safety fixes are provided for v1.2.x. Public v1.0.0 through
-v1.1.1 can be upgraded directly to v1.2.0 without uninstalling. The release
+v1.2.0 can be upgraded directly to v1.2.1 without uninstalling. The release
 also retains the verified public v1.0.0 bootstrap path.
 
 ## Reporting a vulnerability

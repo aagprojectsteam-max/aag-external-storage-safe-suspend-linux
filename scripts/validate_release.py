@@ -33,6 +33,7 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         "assets",
         "release_date",
         "hibernate",
+        "ordinary_suspend",
     }
     missing = sorted(required - set(manifest))
     if missing:
@@ -49,17 +50,18 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         raise RuntimeError("minimum upgrader schema exceeds release upgrader schema")
     if (
         manifest["config_schema"] != 2
-        or manifest["migration_schema"] != 2
-        or manifest["systemd_wiring_revision"] != 2
+        or manifest["migration_schema"] != 3
+        or manifest["systemd_wiring_revision"] != 3
     ):
-        raise RuntimeError("v1.2.0 schema or wiring metadata is inconsistent")
-    if ">=1.0.0,<1.2.0" not in manifest["supported_upgrade_from"]:
+        raise RuntimeError("v1.2.1 schema or wiring metadata is inconsistent")
+    if ">=1.0.0,<1.2.1" not in manifest["supported_upgrade_from"]:
         raise RuntimeError("public v1.0.0 bootstrap compatibility is not declared")
     required_migrations = {
         "bootstrap-public-v1.0.0-to-installed-state-v1",
         "upgrader-schema-1-to-2",
         "config-schema-1-to-2-hibernate-policy",
         "wiring-revision-1-to-2-plain-hibernate",
+        "wiring-revision-2-to-3-ordinary-usbclone-gate",
         "adopt-accepted-reference-hibernate-qualification-v1",
     }
     if not required_migrations.issubset(set(manifest["migration_ids"])):
@@ -71,6 +73,12 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         "hybrid_sleep": "NOT_ENABLED_NOT_ACCEPTED",
     }:
         raise RuntimeError("Hibernate support scope is inconsistent")
+    if manifest["ordinary_suspend"] != {
+        "usbclone_gate": "ENABLED_FAIL_CLOSED",
+        "loaded_dummy_hcd_without_bound_device": "ALLOWED",
+        "active_guest_usb_detach": "NEVER_AUTOMATIC",
+    }:
+        raise RuntimeError("ordinary-suspend USBClone scope is inconsistent")
     assets = manifest["assets"]
     if not isinstance(assets, dict) or not assets:
         raise RuntimeError("release assets are missing")
@@ -92,6 +100,8 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         "assets": len(assets),
         "upgrade_from_v1_0_0": True,
         "upgrade_from_v1_1_1": True,
+        "upgrade_from_v1_2_0": True,
+        "ordinary_usbclone_gate": "ENABLED_FAIL_CLOSED",
         "plain_hibernate": "SUPPORTED_ON_REFERENCE_PLATFORM",
     }
 

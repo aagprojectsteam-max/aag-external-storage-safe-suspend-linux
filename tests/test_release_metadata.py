@@ -31,18 +31,24 @@ class ReleaseMetadataTests(unittest.TestCase):
                     "upgrader_schema": 2,
                     "config_schema": 2,
                     "state_schema": 1,
-                    "migration_schema": 2,
-                    "systemd_wiring_revision": 2,
+                    "migration_schema": 3,
+                    "systemd_wiring_revision": 3,
                     "udev_rule_revision": 1,
-                    "supported_upgrade_from": [">=1.0.0,<1.2.0"],
+                    "supported_upgrade_from": [">=1.0.0,<1.2.1"],
                     "supported_downgrade_from": [],
                     "migration_ids": [
                         "bootstrap-public-v1.0.0-to-installed-state-v1",
                         "upgrader-schema-1-to-2",
                         "config-schema-1-to-2-hibernate-policy",
                         "wiring-revision-1-to-2-plain-hibernate",
+                        "wiring-revision-2-to-3-ordinary-usbclone-gate",
                         "adopt-accepted-reference-hibernate-qualification-v1",
                     ],
+                    "ordinary_suspend": {
+                        "usbclone_gate": "ENABLED_FAIL_CLOSED",
+                        "loaded_dummy_hcd_without_bound_device": "ALLOWED",
+                        "active_guest_usb_detach": "NEVER_AUTOMATIC",
+                    },
                     "assets": {"asset.run": digest},
                     "hibernate": {
                         "plain": "SUPPORTED_ON_REFERENCE_PLATFORM",
@@ -57,7 +63,7 @@ class ReleaseMetadataTests(unittest.TestCase):
 
     def test_consistent_release_metadata_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            result = validate_release.validate(self.fixture(Path(temporary)), "v1.2.0")
+            result = validate_release.validate(self.fixture(Path(temporary)), "v1.2.1")
         self.assertEqual(result["status"], "PASS")
 
     def test_asset_and_metadata_mismatch_fails(self) -> None:

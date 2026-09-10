@@ -19,6 +19,7 @@ class SystemdGraphTests(unittest.TestCase):
             text(path)
             for path in (
                 "systemd/aag-external-storage-safe-suspend.service",
+                "systemd/aag-external-storage-safe-ordinary-suspend.service",
                 "systemd/aag-external-storage-safe-suspend-resume.service",
                 "systemd/aag-external-storage-safe-suspend-failure.service",
                 "systemd/systemd-suspend.service.d/70-aag-external-storage-safe-suspend.conf",
@@ -41,8 +42,18 @@ class SystemdGraphTests(unittest.TestCase):
 
     def test_native_suspend_requires_preparation(self) -> None:
         dropin = text("systemd/systemd-suspend.service.d/70-aag-external-storage-safe-suspend.conf")
-        self.assertIn("Requires=aag-external-storage-safe-suspend.service", dropin)
-        self.assertIn("After=aag-external-storage-safe-suspend.service", dropin)
+        self.assertIn("Requires=aag-external-storage-safe-ordinary-suspend.service", dropin)
+        self.assertIn("After=aag-external-storage-safe-ordinary-suspend.service", dropin)
+        self.assertNotIn("Requires=aag-external-storage-safe-suspend.service", dropin)
+
+    def test_usbclone_gate_precedes_fence_and_all_ordinary_integrations(self) -> None:
+        unit = text("systemd/aag-external-storage-safe-ordinary-suspend.service")
+        gate = "ExecStartPre=/usr/local/libexec/aag-safe-suspend usbclone-preflight"
+        begin = "ExecStartPre=/usr/local/libexec/aag-safe-suspend begin"
+        prepare = "ExecStart=/usr/local/libexec/aag-safe-suspend prepare"
+        self.assertLess(unit.index(gate), unit.index(begin))
+        self.assertLess(unit.index(begin), unit.index(prepare))
+        self.assertNotIn("systemd-hibernate.service", unit)
 
     def test_resume_is_ordered_after_native_suspend(self) -> None:
         dropin = text("systemd/systemd-suspend.service.d/70-aag-external-storage-safe-suspend.conf")
@@ -57,6 +68,7 @@ class SystemdGraphTests(unittest.TestCase):
 
     def test_failures_route_to_fail_closed_recovery(self) -> None:
         for path in (
+            "systemd/aag-external-storage-safe-ordinary-suspend.service",
             "systemd/aag-external-storage-safe-suspend.service",
             "systemd/aag-external-storage-safe-suspend-resume.service",
             "systemd/systemd-suspend.service.d/70-aag-external-storage-safe-suspend.conf",
@@ -98,6 +110,7 @@ class SystemdGraphTests(unittest.TestCase):
             ):
                 directory.mkdir(parents=True, exist_ok=True)
             for name in (
+                "aag-external-storage-safe-ordinary-suspend.service",
                 "aag-external-storage-safe-suspend.service",
                 "aag-external-storage-safe-suspend-resume.service",
                 "aag-external-storage-safe-suspend-failure.service",
@@ -159,6 +172,7 @@ class SystemdGraphTests(unittest.TestCase):
                     analyzer,
                     f"--root={root}",
                     "verify",
+                    "aag-external-storage-safe-ordinary-suspend.service",
                     "aag-external-storage-safe-suspend.service",
                     "aag-external-storage-safe-suspend-resume.service",
                     "aag-external-storage-safe-suspend-failure.service",

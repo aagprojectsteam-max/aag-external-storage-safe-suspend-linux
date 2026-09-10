@@ -24,6 +24,7 @@ class MigrationTests(unittest.TestCase):
                 "upgrader-schema-1-to-2",
                 "config-schema-1-to-2-hibernate-policy",
                 "wiring-revision-1-to-2-plain-hibernate",
+                "wiring-revision-2-to-3-ordinary-usbclone-gate",
             ],
         )
         self.assertTrue(all(item.idempotent and item.rollback for item in plan))
@@ -31,8 +32,25 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(migrated["migration_schema"], 1)
         self.assertEqual(migrated["upgrader_schema"], 2)
         self.assertEqual(migrated["configuration_schema"], 2)
-        self.assertEqual(migrated["systemd_wiring_revision"], 2)
+        self.assertEqual(migrated["systemd_wiring_revision"], 3)
         self.assertEqual(migrations.apply(migrated, plan), migrated)
+
+    def test_v1_2_0_wiring_migrates_only_to_usbclone_revision(self) -> None:
+        active = {
+            "installed_version": "1.2.0",
+            "state_schema": 1,
+            "migration_schema": 2,
+            "upgrader_schema": 2,
+            "configuration_schema": 2,
+            "systemd_wiring_revision": 2,
+        }
+        plan = migrations.plan(active, legacy_bootstrap=False)
+        self.assertEqual(
+            [item.migration_id for item in plan],
+            ["wiring-revision-2-to-3-ordinary-usbclone-gate"],
+        )
+        migrated = migrations.apply(active, plan)
+        self.assertEqual(migrated["systemd_wiring_revision"], 3)
 
     def test_unknown_schema_refuses(self) -> None:
         with self.assertRaises(migrations.MigrationError):

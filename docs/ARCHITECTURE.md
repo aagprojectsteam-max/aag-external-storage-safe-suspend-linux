@@ -18,9 +18,14 @@ implementation. Its hard invariants are:
 
 ## Installed components
 
+- `aag-external-storage-safe-ordinary-suspend.service` performs the read-only
+  ConfigFS/dummy-HCD gate, then arms and prepares the ordinary storage
+  transaction. Keeping this as the ordinary entry point places the gate before
+  every configured pre-suspend integration without adding it to Hibernate.
 - `aag-external-storage-safe-suspend.service` arms the fence, validates internal
   storage, resolves the external generation, waits for managed work, performs
-  the pre-sleep audit, and releases target filesystems.
+  the pre-sleep audit, and releases target filesystems for the separate plain
+  Hibernate path.
 - A drop-in makes `systemd-suspend.service` require the pre-sleep service and
   queues the resume verifier after the native suspend service returns.
 - `aag-external-storage-safe-suspend-resume.service` handles USB
@@ -54,7 +59,14 @@ real blocker. Permission or enumeration gaps fail closed.
 
 ## Suspend sequence
 
-The marker is created before pre-sleep work. Optional managed backup quiescing
+Before the marker is created, the ordinary-only gate enumerates bound ConfigFS
+gadgets and USB devices instantiated below dummy-HCD controllers. Empty loaded
+controllers pass. A bound or orphan virtual device refuses without writing UDC,
+detaching USB, signalling a guest, or invoking an integration hook. A
+pre-fence refusal leaves the transaction `IDLE`, so a later safe retry is not
+poisoned by a recovery latch.
+
+The marker is then created before pre-sleep work. Optional managed backup quiescing
 uses an explicit argv command. CPU, process I/O, block counters, and descendants
 drive the progress window; the overall awake safety ceiling is separately
 bounded. After a stable audit, host target mounts are cleanly unmounted,
@@ -96,10 +108,16 @@ license to weaken the storage audit. VM and unrelated vendor policy remain
 separate projects. The optional reference T700 integration is confined to plain
 Hibernate; it does not alter ordinary suspend, send AT commands, or start GNSS.
 
+The USBClone gate is earlier than the ordinary integration boundary. This
+prevents the proven bound-gadget condition from reaching an ordinary T700 hook.
+It does not clear T700 review state: a pre-existing latch remains owned by the
+T700 verifier and must be reviewed through that subsystem.
+
 ## Installed state and upgrades
 
-The ordinary runtime architecture remains `suspend-contract-v1`; v1.2.0 adds
-the separate `plain-hibernate-reference-v1` contract. Maintenance is a separate
+The v1.2.1 ordinary runtime architecture is
+`ordinary-usbclone-gate-v1+suspend-contract-v1`; the separate
+`plain-hibernate-reference-v1` contract is unchanged. Maintenance is a separate
 transaction around project-owned installation paths. Canonical
 root-only state records schemas, release identity, file ownership classes and
 hashes, selected configuration identity, migrations, pristine repair payload,

@@ -23,6 +23,12 @@ permission gap, changing identity, unstable audit, or failed clean unmount
 fails closed. There is no force unmount, lazy unmount, generic process kill, or
 unknown-owner termination.
 
+For virtual USB, the known regression class is a bound ConfigFS mass-storage
+gadget on dummy-HCD. Empty loaded controllers are not classified as causal. A
+bound unmanaged gadget, a different bound function, or a dummy-HCD USB device
+without an observable ConfigFS owner remains fail-closed as unproven. The gate
+does not perform teardown, so an active WinBoat/QEMU guest cannot be hot-unplugged.
+
 ### Emergency fallback
 
 Recovery samples firmware thermal trip points and NVMe thresholds while also
@@ -41,6 +47,11 @@ mirrors, PID reuse, short-lived process churn, post-resume automount races,
 external bridge re-enumeration, installer races, and partial installer failure.
 It preserves explicitly configured internal filesystems and unrelated USB
 automount behavior.
+
+Installer graph snapshots are compared semantically: unordered dependency and
+ordering fields are sets, while commands and drop-in membership/order remain
+significant. This avoids representation-only refusals without accepting a real
+graph change.
 
 It does not make failing media reliable; provide UPS protection; repair kernel,
 ACPI, USB, or controller firmware; prove application-level backup consistency;

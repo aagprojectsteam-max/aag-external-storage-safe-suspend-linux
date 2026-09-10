@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import __version__, coordinator, hibernate, identity, maintenance
+from . import __version__, coordinator, hibernate, identity, maintenance, usbclone
 from . import config as configuration
 from .job_guard import main as job_guard_main
 
@@ -20,6 +20,7 @@ def main() -> int:
     commands.add_parser("teardown")
     commands.add_parser("resume")
     commands.add_parser("recover")
+    commands.add_parser("usbclone-preflight")
     commands.add_parser("validate")
     commands.add_parser("status")
     commands.add_parser("health-check")
@@ -54,6 +55,8 @@ def main() -> int:
     }
     if args.command in actions:
         return actions[args.command]()
+    if args.command == "usbclone-preflight":
+        return usbclone.preflight()
     if args.command == "validate":
         print(json.dumps(coordinator.validate_installation(), sort_keys=True, indent=2))
         return 0

@@ -27,6 +27,9 @@ machine-specific identifiers are intentionally omitted.
 - Optional generic pre-suspend and post-resume hooks.
 - Plain Hibernate on the exact reference platform after every live readiness
   gate passes.
+- Loaded dummy-HCD controllers with no bound virtual USB device.
+- Ordinary-suspend refusal for a bound ConfigFS mass-storage gadget without
+  automatic guest or USB teardown.
 
 ## Untested
 
