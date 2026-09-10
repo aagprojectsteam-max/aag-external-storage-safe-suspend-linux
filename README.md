@@ -88,7 +88,7 @@ residency, with the USBClone gate, UGREEN terminal state, internal storage,
 T700 verification, and user-session continuation all passing.
 Each release is independently retrieved and verified after publication; the
 versioned verification record is then committed to the default branch. See the
-[v1.2.0 publication verification](docs/PUBLICATION-VERIFICATION-v1.2.0.md).
+[v1.2.1 publication verification](docs/PUBLICATION-VERIFICATION-v1.2.1.md).
 
 ## Install
 
