@@ -11,7 +11,7 @@ manifest. Keep it private: it can include original configuration and machine
 paths. With the same verified asset, use:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.3.0.run transaction --report /var/lib/aag-sleep-transaction/rollback-report --rollback <recorded-backup-directory>
+sudo ./aag-external-storage-safe-suspend-linux-v1.4.0.run transaction --report /var/lib/aag-sleep-transaction/rollback-report --rollback <recorded-backup-directory>
 ```
 
 Before live rollback, keep the lid open and establish that no suspend/recovery
@@ -34,10 +34,10 @@ Use `sudo aag-safe-suspend rollback`. The canonical installed state must point
 to a hash-verified compatible exact previous snapshot; relevant jobs and active
 fences refuse the operation. Configuration, managed files, versions and unit
 wiring return to that recorded state. Running an older installer is an unsupported
-downgrade, not a substitute for rollback. The previous v1.2.1 release remains
-available as historical reference.
+downgrade, not a substitute for rollback. Preserve the verified v1.3.1 asset
+and exact baseline snapshot for v1.4.0 rollback. Older published releases remain available as historical references.
 
-`./aag-external-storage-safe-suspend-linux-v1.3.0.run uninstall` applies to the
+`./aag-external-storage-safe-suspend-linux-v1.4.0.run uninstall` applies to the
 portable profile only. It is not the removal command for the reference adapter.
 v1.3.0 invalidates derived bytecode for replaced managed Python modules so a
 rapid same-size rollback reports and executes the restored version. It validates

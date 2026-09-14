@@ -1,6 +1,6 @@
 # Troubleshooting
 
-## v1.3.0 reference transaction adapter
+## v1.4.0 reference transaction stack
 
 Identify the profile first. The reference adapter records the episode, stage,
 first failure, process stop receipts, kernel entry/exit and actual sleep. A
@@ -23,6 +23,62 @@ A closed-lid wake is not a lid-open pass. Measured hardware sleep and validated
 storage/device recovery are required; a retry remains bounded to its episode.
 Genuine thermal/battery conditions retain safety supervision; ordinary timer
 expiry or exhausted retries no longer cause normal recovery poweroff.
+
+## Reference Hibernate refuses a GO gate
+
+Run only the read-only check on an already configured reference stack:
+
+```bash
+sudo /usr/local/libexec/aag-power-transaction hibernate-readiness
+```
+
+Inspect the named kernel, memory/image, swap/resume mapping, initramfs, storage,
+LockLock or ownership gate. Nominal swap size or an earlier passing test does not
+replace current readiness. See [Hibernate prerequisites](HIBERNATE.md).
+Do not bypass a failed gate or invoke repeated physical cycles to diagnose it.
+
+## Reference S4 image resumed but WWAN is unusable
+
+Keep the failed outcome explicit and preserve live evidence before any reboot or
+recovery change. Check, in order:
+
+1. Kernel/native image-resume evidence and original boot identity, followed by
+   session recovery; a desktop appearing after cold boot is not image proof.
+2. The exact invocation and result of
+   `aag-hibernate-transaction-finish.service`, including whether it acquired the
+   operation lock and reached modem restoration.
+3. Active native/storage/boot callbacks and the actual kernel lock holder.
+   A persistent lock file alone is not a held lock; do not delete it to bypass
+   ownership or start another recovery service.
+4. FM350/T700 PCI identity, driver binding, current WWAN interface generation,
+   control ports, ModemManager and NetworkManager state.
+5. The saved connection's restoration requirement, current connection, IP,
+   routing, and a small DNS/HTTPS check through the cellular interface. Working
+   Wi-Fi does not prove mobile recovery.
+6. DATA, UGREEN safe-release state, required consumers, LockLock, filesystem
+   health, terminal transaction state and stale fences.
+
+Transient modem recovery errors are known on this reference platform; the
+accepted automatic path took approximately two minutes. A visible device alone
+is insufficient. If the bounded owner fails, preserve the private observations
+and diagnose the exact failure without PCI resets, driver reloads, AT commands,
+GNSS activation or a second physical S4 experiment. A reboot restoring service
+would still leave the preceding Hibernate acceptance failed.
+
+The preceding lock-collision defect is fixed in v1.4.0. Late storage teardown
+must finish before the sole owner acquires the lock; modem enumeration must
+finish before profile activation. Compare those stages with the saved evidence.
+See [WWAN recovery](T700-WWAN-HIBERNATE.md) for the qualified behavior.
+
+## LockLock lid behavior differs from expectation
+
+Inspect the lid-ignore control separately from input locks. ON intentionally
+ignores lid closure; OFF restores normal coordinated Suspend. Check inhibitor
+ownership and transaction identity if the behavior persists after disabling
+ignore. Let the owning subsystem reconcile stale state; do not remove a live
+fence or repeatedly close the lid. The accepted
+[LockLock boundary](INTEGRATIONS.md#locklock-and-input-lock) preserves subsequent
+normal transactions and requires session/input recovery.
 
 ## Portable profile
 

@@ -77,7 +77,10 @@ The baseline JSON is a list of installed absolute paths and expected SHA256
 hashes. The gate JSON and runtime configuration must match the reviewed simulation
 and regression results for this host. Do not fabricate gates to enable deployment.
 This route invokes the unchanged qualified S4 deployer; it never requests sleep.
-Use `hibernate-readiness` afterward to inspect the live GO gates. The detailed
+Use `sudo /usr/local/libexec/aag-power-transaction hibernate-readiness`
+afterward to inspect the live GO gates. The [Hibernate prerequisites](HIBERNATE.md)
+cover kernel support, available memory/swap, resume mapping and initramfs. The
+tested 64 GiB RAM / 72 GiB swapfile is context, not a sizing rule. The detailed
 [Hibernate contract](hibernate-transaction.md) defines the hardware, memory,
 resume image, owner and restoration scope. An existing accepted installation
 needs no redeployment for release publication.

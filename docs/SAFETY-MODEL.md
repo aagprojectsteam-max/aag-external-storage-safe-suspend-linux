@@ -1,5 +1,35 @@
 # Safety model
 
+## Qualified reference stack: v1.4.0
+
+The reference policy is **protect data → safely stop/release ordinary userspace
+blockers → enter sleep**. Known checkpoint or stop APIs are preferred. A normal
+userspace blocker does not require a hard-coded application allowlist: exact
+resource ownership, process identity and privilege checks determine whether
+bounded TERM, wait and a last-resort safe KILL are eligible. Independent storage
+release verification remains mandatory.
+
+Critical system components, databases, filesystem infrastructure and guests are
+never blindly killed. A guest requires a supported configured shutdown path.
+Ambiguous identity, missing observations or an unsafe release remains a refusal;
+no force/lazy unmount or storage-fence bypass is authorized by this policy.
+Restart follows saved consumer receipts and explicit policy, including `never`.
+
+Stale failure reconciliation and transaction-scoped retries prevent repeated lid
+requests from consuming unrelated retry state. Automatic poweroff is not normal
+recovery for an application blocker. Timer expiry or an exhausted retry alone
+does not justify shutdown; real thermal/battery safety supervision remains active.
+S4 refusal and recovery do not invoke the ordinary retry/poweroff monitor.
+
+See [architecture](ARCHITECTURE.md), [the adapter contract](TRANSACTION-ADAPTER.md)
+and [Hibernate](HIBERNATE.md). These are the qualified reference policies.
+
+## Separate portable profile policy
+
+The decision classes, optional emergency configuration and time policy below
+belong to the older portable coordinator. Its conservative no-generic-kill
+policy and awake-window option are not the corrected reference adapter policy.
+
 ## Decision classes
 
 ### False blocker

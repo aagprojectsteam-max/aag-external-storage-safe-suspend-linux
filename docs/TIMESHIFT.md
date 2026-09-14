@@ -1,4 +1,8 @@
-# Timeshift integration
+# Portable Timeshift integration
+
+This optional wrapper/fence belongs to the portable profile. It is not required
+for generic ordinary-userspace blocker handling in the qualified v1.4.0
+reference stack; that policy is documented in [the safety model](SAFETY-MODEL.md).
 
 Timeshift integration is optional. With `--timeshift`, the installer uses
 package-aware `dpkg-divert` entries for `/usr/bin/timeshift` and

@@ -5,12 +5,20 @@ Versioning.
 
 ## 1.4.0 — 2026-09-14
 
-- Publish the reference S4 transaction with one WWAN recovery owner, durable
+- Publish production-qualified reference Hibernate/S4 with one WWAN recovery
+  owner (`aag-hibernate-transaction-finish.service`), durable
   image/consumer evidence and explicit failure preservation across a later reboot.
 - Fix recovery lock handoff after late storage teardown and wait for modem
   enumeration before bounded saved-profile activation.
 - Qualify one physical S4 cycle with usable cellular DNS/HTTPS, normal session
   recovery, COMPLETE state and no reboot. Preserve the preceding WWAN failure.
+- Restore required consumers completely according to saved receipts and restart
+  policy; retain safe UGREEN release and internal DATA identity/mount protection.
+- Reconcile pre-image aborts and cold boots without another power action;
+  distinguish reboot after failed resume and preserve the preceding evidence.
+- Record final acceptance with 284 automated tests, passing CI, 35-of-35
+  source/installed parity and verified rollback. Scope qualification to the tested
+  configuration; automatic modem recovery took approximately two minutes.
 - Add an explicit packaged `hibernate` deployment/rollback route and pin the
   physically tested S4 runtime. Keep the v1.3.1 Suspend reference bytes intact.
 - Validate portable upgrade/rollback from actual v1.3.1 release bytes and both

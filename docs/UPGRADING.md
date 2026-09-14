@@ -1,5 +1,9 @@
 # In-place upgrades
 
+Documentation updates on `main` after publication do not change the immutable
+v1.4.0 release assets or tag. Download the verified release for installation;
+an already accepted production system needs no upgrade for a documentation edit.
+
 ## v1.3.1 to v1.4.0
 
 Portable upgrades preserve the existing schema and graph; the release adds an
@@ -39,7 +43,7 @@ The release validates a real downloaded v1.2.1 portable asset upgrade and
 rollback in an isolated root, plus the packaged reference file mapping and
 rollback in another isolated root. Neither exercise alters the production host.
 
-## Normal update path
+## Normal portable update path
 
 Download the target release's `.run`, `SHA256SUMS`, and
 `release-manifest.json` from the same GitHub release. Verify the installer, then

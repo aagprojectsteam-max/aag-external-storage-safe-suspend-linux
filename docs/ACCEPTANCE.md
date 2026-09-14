@@ -3,7 +3,62 @@
 The private engineering evidence was reviewed and normalized; raw logs, serials,
 UUIDs, paths, process dumps, and unrelated application data are not published.
 
-Final physical acceptance on the reference platform produced:
+## Final production qualification: v1.4.0
+
+The public release is `v1.4.0`, release commit
+`74a0b48`; the local production checkpoint is retained separately. A later
+documentation-only commit on `main` does not change this immutable release identity.
+
+| Gate | Accepted result |
+|---|---|
+| Automated suite / CI | 284 PASS / PASS |
+| Physical normal lid-close Suspend | PASS; one transaction and real low-power sleep |
+| Long Suspend | PASS |
+| Ordinary userspace blocker handling | PASS |
+| Stale FAILURE_PENDING / retry loop | NONE / NONE |
+| Ordinary fail-safe poweroff policy | Corrected; poweroff not used in accepted cycle |
+| Real S4 image resume | PASS |
+| Desktop, keyboard, mouse and touchpad | PASS; confirmed by user |
+| S4 WWAN recovery owner | aag-hibernate-transaction-finish.service |
+| S4 WWAN recovery invocations / lock collision | 1 / NONE |
+| FM350/T700 device, driver, control ports and manager state | PASS |
+| Saved WWAN connection, IP and routing | PASS |
+| DNS / small HTTPS check through mobile interface | PASS |
+| Manual reboot required after S4 | NO |
+| DATA identity, mount and health | PASS |
+| UGREEN safe-release/restore policy | PASS; verified safely released partitions |
+| Required consumers | PASS; restored according to saved policy |
+| LockLock OFF/ON Suspend integration / S4 state | PASS / PASS |
+| S4 terminal transaction / stale fence / stale WWAN lock | COMPLETE / NONE / NONE |
+| Filesystem health | PASS; online checks |
+| Full Hibernate acceptance | PASS |
+| Accepted Suspend v1.3.1 baseline | PRESERVED |
+| Source/installed SHA256 parity | 35 OF 35 |
+| Exact rollback | VERIFIED; v1.3.1 baseline retained |
+| Anonymous public release verification | PASS; 12 assets across v1.3.0, v1.3.1 and v1.4.0 |
+
+The final suite has 284 tests; the 283-test count in the release's pre-physical
+record precedes the additional release metadata regression. Packaging verified
+both reference routes and actual public v1.3.1 portable upgrade/exact rollback
+in isolated roots. It did not require another physical cycle.
+
+The preceding real S4 image resume with WWAN lock collision remains
+`PARTIAL_PASS_WWAN_FAILURE`, with a manual reboot required for modem recovery.
+User-interrupted Suspend attempts remain `USER_INTERRUPTED` /
+`INVALID_FOR_ACCEPTANCE`. Neither contributes a pass to this matrix.
+
+Qualification is limited to the tested reference configuration. Transient modem
+errors occurred after S4, but one recovery owner restored real mobile service in
+approximately two minutes without reboot. The Windows guest was shut down for
+the memory gate. UGREEN qualification is safe release, not a promise of automatic
+external-partition remounts; consumer restoration respects `never` policies.
+GNSS remains on demand. Long-term endurance and arbitrary hardware/firmware are
+not qualified. See [tested hardware](TESTED-HARDWARE.md) and
+[Hibernate recovery](T700-WWAN-HIBERNATE.md).
+
+## Historical portable Suspend acceptance
+
+The original portable physical acceptance on the reference platform produced:
 
 | Gate                                         | Result            |
 | -------------------------------------------- | ----------------- |
@@ -26,7 +81,7 @@ These are observations from one accepted reference machine. They do not claim a
 universal hardware guarantee. The public reconstruction adds only sanitized,
 synthetic fixtures; no raw private evidence is shipped.
 
-## Plain-Hibernate acceptance
+## Historical portable plain-Hibernate acceptance
 
 One separately authorized reference-platform cycle produced:
 
@@ -53,7 +108,7 @@ record. The public implementation contains the final delayed stable-generation
 correction only. Plain Hibernate is accepted on the reference platform;
 suspend-then-hibernate and hybrid sleep are not accepted.
 
-## Ordinary USBClone regression acceptance
+## Historical portable ordinary USBClone regression acceptance
 
 The accepted reference regression was reconstructed from private evidence and
 published only as normalized facts. A prior ordinary cycle with two bound

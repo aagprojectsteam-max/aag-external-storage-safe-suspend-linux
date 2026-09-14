@@ -1,5 +1,21 @@
 # Upgrade test matrix
 
+## v1.4.0 accepted validation
+
+The final automated suite passed **284 tests**, with passing main/tag CI and
+release validation. Built-asset checks exercised the portable installer, reference
+`transaction` route and explicit reference `hibernate` route in isolated roots.
+Actual public v1.3.1 bytes were used for portable upgrade and exact rollback.
+Both accepted reference runtime manifests remained pinned; live source/installed
+parity was 35 of 35. Anonymous verification covered 12 assets across the current
+release and preserved v1.3.0/v1.3.1 baselines.
+
+S4 regressions cover callback lock handoff, late storage teardown, exactly one
+recovery owner, modem enumeration before profile activation, durable consumer
+restoration, abort/cold-boot reconciliation and post-reboot evidence preservation.
+The [physical acceptance](ACCEPTANCE.md) is separate from isolated packaging
+validation. Historical version-specific counts below retain their original scope.
+
 All upgrade tests use isolated filesystem roots and synthetic identities. They
 perform no suspend, hibernate, reboot, poweroff, mount, unmount, or user-data
 operation.

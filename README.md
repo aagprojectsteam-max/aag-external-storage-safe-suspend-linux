@@ -3,45 +3,50 @@
 [![CI](https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/actions/workflows/ci.yml/badge.svg)](https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**v1.4.0 adds qualified reference Hibernate with automatic cellular recovery.**
-One controlled S4 cycle restored the image, mobile DNS/HTTPS and the normal desktop
-session without reboot. Recovery has one owner and waits for callback lock release
-and stable modem enumeration. The accepted Suspend v1.3.1 runtime is preserved.
-See [the S4 qualification and limitations](docs/RELEASE-NOTES-v1.4.0.md).
+**v1.4.0 is production-qualified on the tested reference platform.** This project
+coordinates Linux Suspend, physical lid-close sleep and plain Hibernate/S4 with
+external-storage safety, DATA/UGREEN preparation and restoration, userspace
+blocker handling, transaction recovery, FM350/T700 cellular recovery and AAG
+LockLock interoperability. The accepted Suspend v1.3.1 runtime is preserved.
 
-**v1.3.1 fixes checkpoint verification for collected user services.** A transient
-service that saved its checkpoint and exited can disappear from systemd before
-verification. The adapter now confirms that the reachable user manager reports
-the unit absent and inactive before accepting the stop. Missing bus access or
-incomplete observations still use the existing safe fallback.
+Qualification applies to the [tested configuration](docs/TESTED-HARDWARE.md).
+The generic Linux design and portable installer do not establish compatibility
+with arbitrary hardware, firmware or existing power-management integrations.
 
-**v1.3.0 adds the physically validated AAG sleep transaction adapter.** On the
-qualified reference installation, normal lid closure now completes one owned
-suspend transaction, safely resolves eligible blockers, verifies actual kernel
-sleep, and restores storage, modem policy and the desktop session.
+## Why this exists
 
-A storage-preparation refusal could leave failure state unreconciled. Repeated
-lid-triggered suspend requests could then exhaust the retry budget and reach
-the fail-safe poweroff path. The new adapter owns preparation through final
-completion, reconciles stale failures, scopes retries to that transaction, and
-coalesces overlapping lid requests. Ordinary recoverable blockers no longer
-reach poweroff merely because a timer expired or a retry was consumed.
+External USB/NVMe devices may disconnect and re-enumerate across a power
+transition. Entering sleep while applications still own their storage can cause
+a failed transition or risk data corruption. The reference stack coordinates:
+
+**workload handling → storage preparation → power transition → verified resume
+→ device/storage restoration → consumer restoration → transaction completion.**
+
+For Hibernate, the transition includes image creation, complete S4 power-off and
+confirmed image resume. Storage, WWAN and required consumers must recover before
+the transaction can become `COMPLETE`; a successful image resume alone is not
+full acceptance.
 
 ## Choose the installation profile
 
 | Profile | Requirements and behavior |
 |---|---|
-| Qualified transaction adapter, new in v1.3.0 | Existing reviewed AAG V2 storage guard, recovery auditor, T700 integration and LockLock; private host configuration pins adapters by SHA256. Includes the accepted end-to-end remediation. |
-| Reference Hibernate extension, new in v1.4.0 | Explicit `hibernate` installer route on the qualified reference stack, with private pinned configuration, passing gates and exact rollback. |
-| Portable storage coordinator | Existing public v1.x install/upgrade interface for a selected external disk. Retains its conservative read-only USBClone gate and separate opt-in reference Hibernate support. It does not automatically become the qualified transaction stack. |
+| Qualified reference transaction stack | Existing reviewed AAG V2 storage guard, recovery auditor, FM350/T700 integration and LockLock; private configuration pins adapters by SHA256. Provides the accepted lid-close/Suspend behavior. |
+| Reference Hibernate extension | Explicit v1.4.0 `hibernate` installer route on that reference stack, with private pinned configuration, passing readiness gates and exact rollback. Adds the separately qualified S4 lifecycle. |
+| Portable storage coordinator | Public v1.x install/upgrade interface for a selected external disk. Retains its conservative read-only USBClone gate and separate opt-in portable Hibernate integration. It does not automatically become the qualified transaction stack. |
 
-The `.run` and source archive contain both profiles. They are distinct owners of
-the native suspend graph: do not layer them together or assume that a normal
-portable upgrade enables the new reference-host adapter. Unreviewed legacy
-helpers and machine configuration are not bundled. See
+The `.run` and source archive contain the reference stack and portable profile.
+They are distinct owners of the native suspend graph: do not layer them together.
+The reference Hibernate extension belongs to the reference stack. Unreviewed
+legacy helpers and machine configuration are not bundled. See
 [installation and prerequisites](docs/INSTALLATION.md).
 
 ## Transaction behavior
+
+A previous architecture could retain stale failure state after storage
+preparation failed. Repeated lid requests could consume shared retry state and
+ultimately reach fail-safe poweroff. Transaction ownership, stale-state
+reconciliation and transaction-scoped retries correct that failure path.
 
 - A single transaction owns preparation, native suspend, recovery and completion.
   Stale `FAILURE_PENDING` is reconciled; retry state belongs to the transaction.
@@ -69,23 +74,61 @@ helpers and machine configuration are not bundled. See
 [Architecture](docs/ARCHITECTURE.md) · [adapter contract](docs/TRANSACTION-ADAPTER.md)
 · [troubleshooting](docs/TROUBLESHOOTING.md)
 
-## Validated scope
+## Hibernate and cellular recovery
 
-The original Suspend qualification and its separately accepted v1.3.1 regression
-matrix remain preserved. Hibernate was independently qualified on the reference
-stack after **283 passing automated tests**: one real S4 image resume, exactly one
-WWAN recovery owner, actual mobile DNS/HTTPS through the cellular interface,
-DATA/UGREEN and consumer restoration by saved policy, and user-confirmed desktop
-and input recovery without reboot. All **35 source/installed entries** matched.
-No stale fence, retry loop or fail-safe poweroff remained.
+Plain S4 requires kernel hibernation support, adequate available memory and
+swap/image capacity, a correct resume device and offset where applicable,
+matching initramfs resume support, safe storage preparation and compatible
+recovery integrations. The reference used **64 GiB RAM and a 72 GiB swapfile**;
+these are validation context, not universal sizing requirements. Read the
+[Hibernate guide](docs/HIBERNATE.md) before configuring another host.
 
-Transient modem/PCIe errors still occur during resume; the owner recovered usable
-service in approximately two minutes. The preceding S4 WWAN failure requiring a
-manual reboot remains a separate failure. Earlier interrupted Suspend cycles are
-also excluded. The tested memory gate required the Windows guest to be shut down.
-This result does not qualify other hardware/firmware, long-term endurance or
-required automatic external-partition remounts. Private reports and identifiers
-are excluded from the public release.
+`aag-hibernate-transaction-finish.service` is the **single S4 WWAN recovery
+owner**. It waits for callback lock release and stable modem enumeration before
+bounded restoration of the saved cellular policy. Competing recovery services
+could race on locks or device generations. Acceptance verified device and driver
+return, control ports, NetworkManager, the saved WWAN connection and real mobile
+DNS/HTTPS without reboot. [FM350/T700 recovery](docs/T700-WWAN-HIBERNATE.md)
+retains GNSS on demand.
+
+## LockLock interoperability
+
+| Lid-ignore state | Expected lid-close behavior |
+|---|---|
+| OFF | Normal coordinated lid-close Suspend |
+| ON | Lid closure intentionally ignored |
+| Disabled after ON | Normal lid-close behavior restored |
+
+These refer to LockLock's lid-ignore control, independently of its input-lock
+controls. Stale inhibitors or state must not poison later transactions. See
+[the integration boundary](docs/INTEGRATIONS.md#locklock-and-input-lock).
+
+## Final accepted validation
+
+| Check | Accepted result |
+|---|---|
+| Automated tests / CI | **284 PASS / PASS** |
+| Physical lid-close Suspend / long Suspend | PASS / PASS |
+| Real S4 image resume / desktop and input recovery | PASS / PASS |
+| DATA / UGREEN / required consumer restoration by saved policy | PASS |
+| FM350/T700 / mobile connectivity without reboot | PASS |
+| LockLock OFF/ON interoperability | PASS |
+| Terminal transaction / stale fence / stale WWAN lock | COMPLETE / NONE / NONE |
+| Source/installed parity | **35 of 35** |
+| Exact rollback / anonymous public asset verification | VERIFIED / 12 assets |
+
+The [normalized acceptance record](docs/ACCEPTANCE.md) separates current
+qualification from historical cycles. The preceding S4 WWAN failure requiring a
+manual reboot remains a failure; user-interrupted Suspend cycles remain invalid
+for acceptance.
+
+**Known limitations:** transient modem recovery errors occurred after S4, but
+usable service recovered automatically in approximately two minutes. This is
+functional recovery, not instantaneous recovery or a firmware-error-free claim.
+The memory gate required the Windows guest to be shut down. UGREEN passed its
+safe-release policy; required automatic external-partition remounts are not
+qualified. Other hardware/firmware and long-term endurance remain unqualified.
+Detailed forensic reports and private identifiers stay local.
 
 ## Verify and install
 

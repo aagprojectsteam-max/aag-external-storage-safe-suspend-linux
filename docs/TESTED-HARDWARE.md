@@ -1,52 +1,59 @@
 # Tested hardware and support matrix
 
-## Tested on
+## Production-qualified reference configuration: v1.4.0
 
-| Component          | Accepted reference                  |
-| ------------------ | ----------------------------------- |
-| Operating system   | Ubuntu Desktop 26.04 LTS            |
-| Desktop/session    | GNOME on Wayland                    |
-| Sleep mode         | s2idle                              |
-| Hibernate mode     | Plain platform S4 with internal ext4 swapfile |
-| External storage   | NVMe through a UGREEN USB enclosure |
-| Bridge             | Realtek RTL9210 (`0bda:9210`)       |
-| Target filesystems | ext4                                |
-| Backup integration | Timeshift wrapper/fence enabled     |
-| WWAN integration   | MediaTek T700 with `mtk_t7xx`, ModemManager and NetworkManager |
+| Component | Accepted reference context |
+|---|---|
+| Operating system / desktop | Ubuntu Desktop 26.04 LTS / GNOME on Wayland |
+| Suspend | s2idle; normal physical lid-close and long Suspend qualified |
+| Hibernate | Plain S4 with image and session restoration |
+| Memory / swap | 64 GiB RAM / 72 GiB internal ext4 swapfile |
+| Internal DATA | Identity-checked, mounted ext4 storage |
+| External UGREEN | USB-attached NVMe, Realtek RTL9210 bridge (`0bda:9210`) |
+| External restoration policy | All target partitions verified safely released; no forced remount |
+| Cellular integration | FM350 / MediaTek T700, `mtk_t7xx`, ModemManager and NetworkManager |
+| WWAN after S4 | Real mobile DNS/HTTPS restored automatically without reboot |
+| AAG LockLock / Input Lock | Lid-ignore OFF/ON integration and S4 state qualified |
+| GNSS | OFF on demand; not automatically started |
 
-Serial numbers, filesystem UUIDs, hostnames, usernames, and other
-machine-specific identifiers are intentionally omitted.
+The memory and swap sizes describe the tested machine, not universal minimums.
+The live memory gate required the Windows guest to be shut down. Transient modem
+errors recovered automatically in approximately two minutes. See the
+[accepted matrix](ACCEPTANCE.md) for the exact validation scope. Hostnames,
+usernames, serials, filesystem UUIDs and modem/SIM identifiers are omitted.
 
-## Supported by design
+## Generic Linux design and portable capabilities
 
-- One explicitly selected USB-attached whole disk.
-- A different kernel device name after re-enumeration.
-- Multiple filesystem-bearing partitions, each with a unique UUID.
-- Configured internal mount identity protection.
-- Unrelated USB media appearing during the same resume window.
-- Optional generic pre-suspend and post-resume hooks.
-- Plain Hibernate on the exact reference platform after every live readiness
-  gate passes.
-- Loaded dummy-HCD controllers with no bound virtual USB device.
-- Ordinary-suspend refusal for a bound ConfigFS mass-storage gadget without
-  automatic guest or USB teardown.
+These design capabilities do not establish physical qualification on another host:
 
-## Untested
+- One selected USB-attached whole disk, reidentified after device-name changes.
+- Multiple filesystem-bearing partitions with distinct stable identities.
+- Protected internal mounts and unrelated USB media left outside target actions.
+- Portable optional pre-suspend/post-resume hooks and Timeshift fencing.
+- Loaded empty dummy-HCD controllers accepted by the portable gate; bound
+  gadgets refused without automatic guest or USB teardown.
+- The reference profile separately supports reviewed guest shutdown followed by
+  verified ownership release; it never blindly kills a guest or detaches active USB.
 
-- Other Linux distributions and init systems.
-- X11 sessions or non-GNOME desktop automounters.
-- Other bridge chipsets and enclosure firmware.
-- Encrypted, LVM, ZFS, btrfs subvolume, RAID, or other stacked target layouts.
-- Thunderbolt/PCIe external storage.
-- Multiple independently protected external backup disks.
-- Suspend-then-hibernate and hybrid sleep.
-- Plain Hibernate on hardware other than the accepted reference platform.
+The portable and reference graphs are separate installation profiles. The older
+portable ext4/Timeshift and USBClone results remain historical acceptance records.
+They do not extend the v1.4.0 S4 reference claim to every integration.
 
-## Qualification requirement
+## Not qualified by this result
 
-Passing the offline suite is necessary but not sufficient for new hardware.
-Validate current backups, inspect `aag-safe-suspend validate`, and perform one
-supervised ordinary suspend/resume acceptance cycle on a hard ventilated surface
-before relying on a new platform. Plain Hibernate additionally requires every
-gate from `sudo aag-safe-suspend health-check` and its own supervised physical
-acceptance before extending the support claim to different hardware.
+- Other distributions, init systems, desktops, kernel/firmware combinations or
+  bridge chipsets.
+- Encrypted, LVM, ZFS, btrfs subvolume, RAID or other stacked target layouts.
+- Thunderbolt/PCIe external storage or multiple independently protected disks.
+- Required automatic external-partition remounts after S4.
+- Hybrid sleep, suspend-then-hibernate, arbitrary S4 hardware or long-term endurance.
+
+## Qualifying another platform
+
+Offline tests and a compatible inspected configuration are prerequisites, not
+physical proof. Use the readiness checks for the selected
+[installation profile](INSTALLATION.md), verify backups, and establish a safe
+thermal, workload and storage state before supervised physical qualification.
+Hibernate additionally requires all current [resume and capacity gates](HIBERNATE.md).
+Accepted production installations do not need repeated cycles for documentation
+or release publication.

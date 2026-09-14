@@ -1,5 +1,36 @@
 # Integration boundaries
 
+## Qualified reference integrations
+
+v1.4.0 coordinates the reviewed AAG storage guard, recovery auditor, workload
+adapters, FM350/T700 and LockLock through private pinned contracts. The reference
+blocker policy supports generic eligible ordinary userspace and supported guest
+shutdown, with independent storage release verification. See
+[the safety model](SAFETY-MODEL.md). The portable hook restrictions below do not
+replace that reference policy.
+
+S4 WWAN recovery belongs solely to
+`aag-hibernate-transaction-finish.service`. Suspend retains its accepted v1.3.1
+integration. Do not add a portable recovery hook or competing timer to the
+reference S4 graph. GNSS remains on demand. See [FM350/T700](T700-WWAN-HIBERNATE.md).
+
+## LockLock and Input Lock
+
+| LockLock lid-ignore | Required behavior |
+|---|---|
+| OFF | Normal coordinated lid-close Suspend |
+| ON | Lid-close ignore is intentional |
+| Turned OFF after ON | Normal lid-close behavior returns |
+
+Lid-ignore is distinct from keyboard, mouse and touchpad lock controls. The
+power transaction respects intentional ignore, owns its temporary recovery
+inhibitor, and reconciles stale state so it cannot poison a later transaction.
+The final qualification passed OFF/ON Suspend interoperability, S4 state and
+user-confirmed desktop/input recovery. This repository documents the boundary;
+LockLock's own project remains the source for its complete control interface.
+
+## Portable profile hooks
+
 The configuration accepts optional absolute-argv commands at two serialized
 boundaries:
 

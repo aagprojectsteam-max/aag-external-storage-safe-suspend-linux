@@ -1,6 +1,6 @@
 # Architecture
 
-## v1.3.0 qualified transaction owner
+## v1.4.0 qualified reference stack
 
 The reference adapter owns the complete ordinary-suspend lifecycle around the
 existing V2 storage/T700/LockLock stack. PREPARING_SLEEP resolves actual blockers;
@@ -20,10 +20,52 @@ fallback. The independent storage audit remains decisive. See
 manifest. The public package version is metadata; qualified runtime and unit
 bytes remain the accepted implementation.
 
+## Hibernate extension and restoration order
+
+The S4 extension reuses the accepted v1.3.1 preparation and consumer receipts.
+Explicitly typed Hibernate records share the durable power ledger and fence;
+ordinary Suspend delegates to its original accepted runtime.
+
+```mermaid
+flowchart LR
+    A[Transaction and saved policy] --> B[Blockers and storage preparation]
+    B --> C[Native S4 image and power-off]
+    C --> D[Confirmed image resume]
+    D --> E[Device and storage audit]
+    E --> F[Single WWAN recovery owner]
+    F --> G[Required consumer restoration]
+    G --> H[COMPLETE and fence release]
+```
+
+The sole S4 owner, `aag-hibernate-transaction-finish.service`, waits for native,
+storage and boot callbacks to release the operation lock. A durable recovery
+token prevents duplicate WWAN recovery; stable device generation and modem
+readiness precede bounded saved-profile activation. UGREEN returns to verified
+safe release, DATA retains its identity and mount, and consumers restore only
+according to their saved policy. Image resume alone cannot mark this complete.
+
+Readiness is rechecked immediately before image write. Aborts reconcile safely
+without a second power action. Boot reconciliation preserves the previous ledger
+and distinguishes cold boot from reboot after failed resume; it uses current
+device identity instead of replaying stale sysfs state. A failed restoration
+retains its evidence and fence until safe reconciliation. See the
+[Hibernate guide](HIBERNATE.md) and [full S4 contract](hibernate-transaction.md).
+
+The old ordinary-suspend failure allowed stale `FAILURE_PENDING` plus repeated
+lid requests to exhaust shared retries and reach poweroff. The current owner
+reconciles stale state and scopes retry decisions to the live transaction.
+Ordinary application blockers are resolved safely, not escalated to shutdown
+solely on a timer or retry count. Physical thermal/battery supervision remains.
+
+[LockLock integration](INTEGRATIONS.md#locklock-and-input-lock) distinguishes
+intentional lid-ignore from a stale inhibitor and preserves later normal sleep.
+The [acceptance matrix](ACCEPTANCE.md) records both Suspend and S4 qualification.
+
 ## Portable profile architecture
 
-The remaining sections describe the existing portable profile. v1.3.0 does not
-automatically convert that graph into the reference integration.
+The remaining sections describe the separate portable profile retained in
+v1.4.0. Its older Hibernate service graph and conservative blocker policy do not
+automatically become the qualified reference integration described above.
 
 ## Boundary and invariants
 
