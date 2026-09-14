@@ -1,0 +1,11 @@
+[Unit]
+Description=AAG reconcile incomplete sleep transactions from the previous boot
+After=local-fs.target
+RequiresMountsFor=/mnt/data
+Before=aag-storage-sleep-v2.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/aag-sleep-transaction boot-reconcile
+TimeoutStartSec=40s
+[Install]
+WantedBy=multi-user.target

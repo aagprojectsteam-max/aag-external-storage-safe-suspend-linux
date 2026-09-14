@@ -1,0 +1,12 @@
+#!/usr/bin/python3
+"""Entry point for the locally qualified production transaction adapter."""
+import sys
+sys.dont_write_bytecode = True
+sys.path.insert(0, "/usr/local/lib/aag-sleep-transaction")
+from aag_safe_suspend.production import main
+
+try:
+    raise SystemExit(main())
+except Exception as exc:
+    print("SUSPEND_TRANSACTION_REFUSED " + str(exc), file=sys.stderr, flush=True)
+    raise SystemExit(1)
