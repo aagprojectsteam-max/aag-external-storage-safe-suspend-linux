@@ -45,3 +45,15 @@ cache ownership and rejects symlinked cache directories/entries.
 
 Private forensic originals and user storage are not publication assets and are
 never removed as part of publishing or verifying a rollback.
+
+## Reference Hibernate extension
+
+Use the verified v1.4.0 asset's `hibernate --report <private-report-directory>
+--rollback <recorded-s4-backup-directory>` route. It restores the exact S4
+manifest's bytes, permissions and ownership, validates the graph and reloads
+systemd; it does not perform a power transition. The operation requires an idle
+power ledger. Apply staged S4 snapshots newest first before rolling back the
+underlying reference transaction adapter. Do not replay archived runtime state or
+remove a live failure fence to force rollback. Preserve the accepted v1.3.1 release
+and the original baseline snapshot. The same route supports isolated roots with
+`--root <temporary-prefix> --test-mode`.

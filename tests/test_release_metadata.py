@@ -34,7 +34,7 @@ class ReleaseMetadataTests(unittest.TestCase):
                     "migration_schema": 3,
                     "systemd_wiring_revision": 3,
                     "udev_rule_revision": 1,
-                    "supported_upgrade_from": [">=1.0.0,<1.3.1"],
+                    "supported_upgrade_from": [">=1.0.0,<1.4.0"],
                     "supported_downgrade_from": [],
                     "migration_ids": [
                         "bootstrap-public-v1.0.0-to-installed-state-v1",
@@ -49,6 +49,17 @@ class ReleaseMetadataTests(unittest.TestCase):
                         "scope": "QUALIFIED_EXISTING_V2_T700_LOCKLOCK_STACK",
                         "automatic_portable_conversion": False,
                         "accepted_implementation_commit": "8c0095236f1095e29f5674db0a32476f431c964b",
+                    },
+                    "reference_hibernate": {
+                        "installer_command": "hibernate",
+                        "scope": "QUALIFIED_EXISTING_V2_T700_LOCKLOCK_STACK",
+                        "automatic_portable_conversion": False,
+                        "accepted_implementation_commit": "5cc43022551ad521f13af1eea72099b854e45230",
+                        "runtime_sha256_manifest": "docs/hibernate-runtime-sha256.json",
+                        "wwan_recovery_owner": "aag-hibernate-transaction-finish.service",
+                        "physical_s4_acceptance": "PASS",
+                        "mobile_connectivity_after_s4": "PASS",
+                        "manual_reboot_required": False,
                     },
                     "ordinary_suspend": {
                         "usbclone_gate": "ENABLED_FAIL_CLOSED",
@@ -69,7 +80,7 @@ class ReleaseMetadataTests(unittest.TestCase):
 
     def test_consistent_release_metadata_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            result = validate_release.validate(self.fixture(Path(temporary)), "v1.3.1")
+            result = validate_release.validate(self.fixture(Path(temporary)), "v1.4.0")
         self.assertEqual(result["status"], "PASS")
 
     def test_asset_and_metadata_mismatch_fails(self) -> None:
@@ -85,6 +96,22 @@ class ReleaseMetadataTests(unittest.TestCase):
             self.assertRaisesRegex(RuntimeError, "does not match"),
         ):
             validate_release.validate(self.fixture(Path(temporary)), "v1.0.0")
+
+    def test_wrong_s4_owner_or_weakened_acceptance_is_rejected(self) -> None:
+        for key, value in (
+            ("wwan_recovery_owner", "legacy.service"),
+            ("mobile_connectivity_after_s4", "NOT_TESTED"),
+            ("manual_reboot_required", True),
+            ("automatic_portable_conversion", True),
+        ):
+            with tempfile.TemporaryDirectory() as temporary:
+                dist = self.fixture(Path(temporary))
+                path = dist / "release-manifest.json"
+                manifest = json.loads(path.read_text())
+                manifest["reference_hibernate"][key] = value
+                path.write_text(json.dumps(manifest))
+                with self.assertRaisesRegex(RuntimeError, "qualification scope"):
+                    validate_release.validate(dist)
 
 
 if __name__ == "__main__":

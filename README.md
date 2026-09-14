@@ -3,6 +3,12 @@
 [![CI](https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/actions/workflows/ci.yml/badge.svg)](https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+**v1.4.0 adds qualified reference Hibernate with automatic cellular recovery.**
+One controlled S4 cycle restored the image, mobile DNS/HTTPS and the normal desktop
+session without reboot. Recovery has one owner and waits for callback lock release
+and stable modem enumeration. The accepted Suspend v1.3.1 runtime is preserved.
+See [the S4 qualification and limitations](docs/RELEASE-NOTES-v1.4.0.md).
+
 **v1.3.1 fixes checkpoint verification for collected user services.** A transient
 service that saved its checkpoint and exited can disappear from systemd before
 verification. The adapter now confirms that the reachable user manager reports
@@ -26,6 +32,7 @@ reach poweroff merely because a timer expired or a retry was consumed.
 | Profile | Requirements and behavior |
 |---|---|
 | Qualified transaction adapter, new in v1.3.0 | Existing reviewed AAG V2 storage guard, recovery auditor, T700 integration and LockLock; private host configuration pins adapters by SHA256. Includes the accepted end-to-end remediation. |
+| Reference Hibernate extension, new in v1.4.0 | Explicit `hibernate` installer route on the qualified reference stack, with private pinned configuration, passing gates and exact rollback. |
 | Portable storage coordinator | Existing public v1.x install/upgrade interface for a selected external disk. Retains its conservative read-only USBClone gate and separate opt-in reference Hibernate support. It does not automatically become the qualified transaction stack. |
 
 The `.run` and source archive contain both profiles. They are distinct owners of
@@ -64,40 +71,38 @@ helpers and machine configuration are not bundled. See
 
 ## Validated scope
 
-The accepted reference implementation passed **201 automated tests** before
-physical acceptance. The v1.3.1 candidate passes **215 tests**, including packaging and maintenance
-regressions. One final physical lid-close/open test under an existing
-workload recorded **112.615150 seconds** of hardware/PMC low-power sleep, one
-suspend transaction, successful resume, DATA/UGREEN restoration and **21 passing
-FM350/T700 checks**. There was no retry loop, stale failure fence or fail-safe
-poweroff; all 15 installed/source manifest entries matched. The desktop recovered.
+The original Suspend qualification and its separately accepted v1.3.1 regression
+matrix remain preserved. Hibernate was independently qualified on the reference
+stack after **283 passing automated tests**: one real S4 image resume, exactly one
+WWAN recovery owner, actual mobile DNS/HTTPS through the cellular interface,
+DATA/UGREEN and consumer restoration by saved policy, and user-confirmed desktop
+and input recovery without reboot. All **35 source/installed entries** matched.
+No stale fence, retry loop or fail-safe poweroff remained.
 
-This validates the tested Ubuntu/GNOME/s2idle reference stack, not every Linux
-kernel, enclosure, firmware or workload. A prior user-interrupted cycle was
-excluded from acceptance. Only normalized results are public; raw journals,
-identifiers, private policies and forensic reports remain local.
-
-The optional checkpoint API was unavailable during the final test; the safe
-resource-audit fallback succeeded. Cellular reconnection and IP assignment were
-verified, but separate mobile Internet traffic was not tested. Long-duration and
-Hibernate behavior were not requalified by this release's lid test.
+Transient modem/PCIe errors still occur during resume; the owner recovered usable
+service in approximately two minutes. The preceding S4 WWAN failure requiring a
+manual reboot remains a separate failure. Earlier interrupted Suspend cycles are
+also excluded. The tested memory gate required the Windows guest to be shut down.
+This result does not qualify other hardware/firmware, long-term endurance or
+required automatic external-partition remounts. Private reports and identifiers
+are excluded from the public release.
 
 ## Verify and install
 
 Download the `.run`, `SHA256SUMS`, and `release-manifest.json` from the
-[v1.3.1 release](https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/releases/tag/v1.3.1):
+[v1.4.0 release](https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/releases/tag/v1.4.0):
 
 ```bash
 sha256sum --ignore-missing -c SHA256SUMS
-chmod +x aag-external-storage-safe-suspend-linux-v1.3.1.run
+chmod +x aag-external-storage-safe-suspend-linux-v1.4.0.run
 ```
 
 For an already reviewed reference stack, use its private configuration and a
 private deployment-report directory:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.3.1.run transaction   --config /etc/aag-sleep-transaction/config.json   --report /var/lib/aag-sleep-transaction/deployment --check
-sudo ./aag-external-storage-safe-suspend-linux-v1.3.1.run transaction   --config /etc/aag-sleep-transaction/config.json   --report /var/lib/aag-sleep-transaction/deployment
+sudo ./aag-external-storage-safe-suspend-linux-v1.4.0.run transaction   --config /etc/aag-sleep-transaction/config.json   --report /var/lib/aag-sleep-transaction/deployment --check
+sudo ./aag-external-storage-safe-suspend-linux-v1.4.0.run transaction   --config /etc/aag-sleep-transaction/config.json   --report /var/lib/aag-sleep-transaction/deployment
 ```
 
 An already accepted production deployment does not need reinstalling solely
@@ -108,12 +113,12 @@ used for the reference adapter.
 For a fresh **portable** installation, the existing interface remains:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.3.1.run install   --device /dev/disk/by-id/your-external-backup-disk   --protect-mount /mnt/data --timeshift
+sudo ./aag-external-storage-safe-suspend-linux-v1.4.0.run install   --device /dev/disk/by-id/your-external-backup-disk   --protect-mount /mnt/data --timeshift
 ```
 
 Omit `--timeshift` when unused. Protect `/` and every important internal mount.
 The device path is for discovery; stable serial/USB/UUID identity is stored in
-local configuration. Portable v1.0.0 through v1.2.1 upgrades use the verified
+local configuration. Portable v1.0.0 through v1.3.1 upgrades use the verified
 asset without arguments and preserve supported configuration.
 
 ## Upgrade and rollback
@@ -135,7 +140,7 @@ Do not run another physical test merely to publish an already accepted runtime.
 
 Plain Hibernate remains opt-in and separately qualified; see
 [Hibernate](docs/HIBERNATE.md). Suspend-then-hibernate and hybrid sleep are not
-enabled or accepted. [Release notes](docs/RELEASE-NOTES-v1.3.1.md) describe the
+enabled or accepted. [Release notes](docs/RELEASE-NOTES-v1.4.0.md) describe the
 precise release scope and limitations.
 
 ## Development
@@ -145,12 +150,11 @@ make check
 make release-acceptance
 ```
 
-Release validation pins the twelve accepted runtime/entrypoint/unit files by
-SHA256. Those files are deliberately not reformatted during publication;
-packaging and test code use the normal lint/format gates. The qualified adapter package version changes as metadata. The portable
-maintenance writer additionally fixes stale bytecode during rapid rollback;
-that change does not alter the qualified sleep transaction. Tests use synthetic
-fixtures and isolated installation roots. Private `/reports/` is excluded from
+Release validation pins both accepted reference runtime manifests by SHA256.
+The reference initializer remains at its accepted v1.3.1 bytes while portable
+release metadata reports v1.4.0. Packaging and tests use normal lint/format gates.
+Built-asset acceptance includes the explicit Hibernate route and exact rollback;
+all installation tests use synthetic fixtures and isolated installation roots. Private `/reports/` is excluded from
 Git, release payloads and public scans; it is never uploaded as an asset.
 
 Licensed under [MIT](LICENSE). Report storage-safety issues using

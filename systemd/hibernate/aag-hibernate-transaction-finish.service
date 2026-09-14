@@ -1,0 +1,11 @@
+[Unit]
+Description=AAG Hibernate transaction storage, consumer and single-owner WWAN restoration
+After=systemd-hibernate.service aag-storage-sleep-v2.service NetworkManager.service ModemManager.service
+After=aag-sleep-transaction-boot.service
+Conflicts=shutdown.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemd-inhibit --what=sleep:handle-lid-switch --who=AAG-Hibernate-transaction --why=Finish-one-S4-transaction --mode=block /usr/local/libexec/aag-power-transaction hibernate-finish
+TimeoutStartSec=8min
+TimeoutStopSec=10s
+Restart=no

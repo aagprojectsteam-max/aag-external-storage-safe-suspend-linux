@@ -12,7 +12,8 @@
     "systemd/production/resume.conf": "b3aed410021b4b31db74eec229095a241607eb156cf84edb5fbfb4c287102a5a",
     "systemd/production/retry.conf": "846a986e1feeba6cc85b7a256028d7c1ccef24682b8498a0f3e75387fa08ad34",
     "systemd/production/storage.conf": "ebb97e5c1856ba3dac59d13ae43a58318e767bde6e20ed1e2bfde14b077a024a",
-    "systemd/production/touchpad.conf": "f1defe34b68b98154ed4e4e5b3a10e8f490067a9daf762c36e07f580925efafc"
+    "systemd/production/touchpad.conf": "f1defe34b68b98154ed4e4e5b3a10e8f490067a9daf762c36e07f580925efafc",
+    "src/reference-transaction-init.py": "748c80a2aa4fd0fba0a1e974b9825e02254740e2043ba638076f11084f24cac4"
   },
   "baseline_accepted_implementation_commit": "18c23506f89943af65e62c6cce24d45462515994",
   "qualification_note": "v1.3.1 preserves the v1.3.0 transaction architecture and adds confirmed absence handling for collected systemd user units."

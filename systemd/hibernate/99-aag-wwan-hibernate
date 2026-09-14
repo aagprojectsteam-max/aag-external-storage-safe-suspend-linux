@@ -1,0 +1,5 @@
+#!/bin/sh
+# S4 recovery is owned exclusively by aag-hibernate-transaction-finish.service.
+# Native Hibernate queues it after systemd-sleep has thawed the user slice.
+# A system-sleep hook must not start a competing modem recovery generation.
+exit 0

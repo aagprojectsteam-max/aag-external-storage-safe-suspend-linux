@@ -36,6 +36,7 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         "hibernate",
         "ordinary_suspend",
         "transaction_adapter",
+        "reference_hibernate",
     }
     missing = sorted(required - set(manifest))
     if missing:
@@ -55,8 +56,8 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         or manifest["migration_schema"] != 3
         or manifest["systemd_wiring_revision"] != 3
     ):
-        raise RuntimeError("v1.3.1 schema or wiring metadata is inconsistent")
-    if ">=1.0.0,<1.3.1" not in manifest["supported_upgrade_from"]:
+        raise RuntimeError("v1.4.0 schema or wiring metadata is inconsistent")
+    if ">=1.0.0,<1.4.0" not in manifest["supported_upgrade_from"]:
         raise RuntimeError("public v1.0.0 bootstrap compatibility is not declared")
     required_migrations = {
         "bootstrap-public-v1.0.0-to-installed-state-v1",
@@ -93,6 +94,18 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         != "8c0095236f1095e29f5674db0a32476f431c964b"
     ):
         raise RuntimeError("accepted implementation identity mismatch")
+    if manifest["reference_hibernate"] != {
+        "installer_command": "hibernate",
+        "scope": "QUALIFIED_EXISTING_V2_T700_LOCKLOCK_STACK",
+        "automatic_portable_conversion": False,
+        "accepted_implementation_commit": "5cc43022551ad521f13af1eea72099b854e45230",
+        "runtime_sha256_manifest": "docs/hibernate-runtime-sha256.json",
+        "wwan_recovery_owner": "aag-hibernate-transaction-finish.service",
+        "physical_s4_acceptance": "PASS",
+        "mobile_connectivity_after_s4": "PASS",
+        "manual_reboot_required": False,
+    }:
+        raise RuntimeError("reference Hibernate qualification scope mismatch")
     assets = manifest["assets"]
     if not isinstance(assets, dict) or not assets:
         raise RuntimeError("release assets are missing")
@@ -117,6 +130,7 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         "upgrade_from_v1_2_0": True,
         "ordinary_usbclone_gate": "ENABLED_FAIL_CLOSED",
         "plain_hibernate": "SUPPORTED_ON_REFERENCE_PLATFORM",
+        "reference_hibernate": "PHYSICALLY_QUALIFIED_WITH_MOBILE_CONNECTIVITY",
     }
 
 

@@ -1,0 +1,6 @@
+[Unit]
+Description=Retired legacy Hibernate owner; aag-hibernate-transaction-finish owns S4
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/false
+Restart=no

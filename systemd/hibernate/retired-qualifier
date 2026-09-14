@@ -1,0 +1,11 @@
+#!/usr/bin/python3
+"""Retire legacy S4 dispatch while preserving the ordinary failsafe condition."""
+import sys
+
+if sys.argv[1:] == ['allow-suspend-failsafe']:
+    # The power dispatcher now selects the transaction's recovery owner.
+    # Historical legacy markers must never suppress ordinary Suspend safety.
+    raise SystemExit(0)
+print('LEGACY_HIBERNATE_CONTROLLER_RETIRED: use aag-power-transaction hibernate-readiness',
+      file=sys.stderr)
+raise SystemExit(1)

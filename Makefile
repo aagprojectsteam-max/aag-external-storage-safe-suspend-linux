@@ -16,7 +16,7 @@ build: release-check
 
 release-acceptance: build
 	$(PYTHON) scripts/validate_release.py
-	$(PYTHON) scripts/release_acceptance.py dist/*.run
+	$(PYTHON) scripts/release_acceptance.py dist/*.run $(if $(PREVIOUS_ASSET),--previous-asset $(PREVIOUS_ASSET))
 
 clean:
 	rm -rf build dist release-work

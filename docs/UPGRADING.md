@@ -1,5 +1,16 @@
 # In-place upgrades
 
+## v1.3.1 to v1.4.0
+
+Portable upgrades preserve the existing schema and graph; the release adds an
+explicit `hibernate` route for the already qualified reference stack. This route
+requires the reviewed private S4 configuration, tested gates and protected baseline
+hashes described in [installation](INSTALLATION.md). It preserves the accepted
+v1.3.1 Suspend bytes and backs up the exact replaced files. An already accepted
+S4 installation needs no reinstall for publication. Preserve the public v1.3.1
+asset and exact local deployment snapshots for rollback.
+
+
 ## v1.3.0 to v1.3.1
 
 v1.3.1 corrects collected transient-unit checkpoint verification in the reference
@@ -37,8 +48,8 @@ run it directly. An existing supported installation is detected automatically;
 
 ```bash
 sha256sum --ignore-missing -c SHA256SUMS
-chmod +x aag-external-storage-safe-suspend-linux-v1.3.1.run
-sudo ./aag-external-storage-safe-suspend-linux-v1.3.1.run
+chmod +x aag-external-storage-safe-suspend-linux-v1.4.0.run
+sudo ./aag-external-storage-safe-suspend-linux-v1.4.0.run
 ```
 
 The installer reports `FRESH_INSTALL`, `SAME_VERSION`, `UPGRADE`, or a precise
@@ -85,7 +96,7 @@ Hibernate defaults to disabled during an ordinary migration. On the documented
 reference platform, opt in during the same transaction with:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.3.1.run install \
+sudo ./aag-external-storage-safe-suspend-linux-v1.4.0.run install \
   --enable-reference-hibernate
 sudo aag-safe-suspend health-check
 ```

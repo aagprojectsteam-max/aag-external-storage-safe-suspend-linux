@@ -14,7 +14,7 @@ import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.3.1"
+VERSION = "1.4.0"
 PROJECT = "aag-external-storage-safe-suspend-linux"
 EPOCH = 1789344000  # 2026-09-14T00:00:00Z
 EXCLUDES = {
@@ -111,6 +111,9 @@ ENTRYPOINT="$WORK/tree/scripts/install.py"
 if [ "${{1-}}" = "transaction" ]; then
     shift
     ENTRYPOINT="$WORK/tree/scripts/transaction_package.py"
+elif [ "${{1-}}" = "hibernate" ]; then
+    shift
+    ENTRYPOINT="$WORK/tree/scripts/deploy_hibernate.py"
 fi
 AAG_RELEASE_SOURCE="GITHUB_RELEASE_VERIFIED_PAYLOAD" \
 AAG_RELEASE_PAYLOAD_SHA256="$PAYLOAD_SHA256" \
@@ -158,7 +161,7 @@ def build() -> dict[str, object]:
         "migration_schema": 3,
         "systemd_wiring_revision": 3,
         "udev_rule_revision": 1,
-        "supported_upgrade_from": [">=1.0.0,<1.3.1"],
+        "supported_upgrade_from": [">=1.0.0,<1.4.0"],
         "supported_downgrade_from": [],
         "migration_ids": [
             "bootstrap-public-v1.0.0-to-installed-state-v1",
@@ -186,6 +189,17 @@ def build() -> dict[str, object]:
             "suspend_then_hibernate": "NOT_ENABLED_NOT_ACCEPTED",
             "hybrid_sleep": "NOT_ENABLED_NOT_ACCEPTED",
         },
+        "reference_hibernate": {
+            "installer_command": "hibernate",
+            "scope": "QUALIFIED_EXISTING_V2_T700_LOCKLOCK_STACK",
+            "automatic_portable_conversion": False,
+            "accepted_implementation_commit": "5cc43022551ad521f13af1eea72099b854e45230",
+            "runtime_sha256_manifest": "docs/hibernate-runtime-sha256.json",
+            "wwan_recovery_owner": "aag-hibernate-transaction-finish.service",
+            "physical_s4_acceptance": "PASS",
+            "mobile_connectivity_after_s4": "PASS",
+            "manual_reboot_required": False,
+        },
         "assets": assets,
         "public_file_count": len(file_hashes),
         "power_state_actions": "none",
@@ -197,10 +211,11 @@ def build() -> dict[str, object]:
 
 
 def validate_only() -> dict[str, object]:
-    accepted = json.loads((ROOT / "docs/transaction-runtime-sha256.json").read_text())
-    for name, expected in accepted["sha256"].items():
-        if digest((ROOT / name).read_bytes()) != expected:
-            raise RuntimeError("qualified runtime bytes changed: " + name)
+    for manifest in ("transaction-runtime-sha256.json", "hibernate-runtime-sha256.json"):
+        accepted = json.loads((ROOT / "docs" / manifest).read_text())
+        for name, expected in accepted["sha256"].items():
+            if digest((ROOT / name).read_bytes()) != expected:
+                raise RuntimeError("qualified runtime bytes changed: " + name)
     paths = public_files()
     required = {
         Path("README.md"),
@@ -213,6 +228,10 @@ def validate_only() -> dict[str, object]:
         Path("src/aag-sleep-transaction"),
         Path("src/aag_safe_suspend/production.py"),
         Path("docs/transaction-runtime-sha256.json"),
+        Path("docs/hibernate-runtime-sha256.json"),
+        Path("scripts/deploy_hibernate.py"),
+        Path("src/aag-power-transaction"),
+        Path("src/reference-transaction-init.py"),
         Path("src/aag_safe_suspend/maintenance.py"),
         Path("systemd/aag-external-storage-safe-suspend.service"),
         Path("udev/99-aag-external-storage-safe-suspend.rules.in"),

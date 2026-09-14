@@ -3,6 +3,25 @@
 All notable changes are documented here. This project follows Semantic
 Versioning.
 
+## 1.4.0 — 2026-09-14
+
+- Publish the reference S4 transaction with one WWAN recovery owner, durable
+  image/consumer evidence and explicit failure preservation across a later reboot.
+- Fix recovery lock handoff after late storage teardown and wait for modem
+  enumeration before bounded saved-profile activation.
+- Qualify one physical S4 cycle with usable cellular DNS/HTTPS, normal session
+  recovery, COMPLETE state and no reboot. Preserve the preceding WWAN failure.
+- Add an explicit packaged `hibernate` deployment/rollback route and pin the
+  physically tested S4 runtime. Keep the v1.3.1 Suspend reference bytes intact.
+- Validate portable upgrade/rollback from actual v1.3.1 release bytes and both
+  reference package routes in isolated roots; publish no private host evidence.
+
+## 1.3.1 — 2026-09-14
+
+- Verify collected transient user services through a reachable user manager
+  before accepting their durable checkpoint and stopped state.
+- Preserve the accepted Suspend architecture and saved never-restart policies.
+
 ## 1.3.0 — 2026-09-14
 
 - Publish the qualified reference-host transaction owner with stale-failure

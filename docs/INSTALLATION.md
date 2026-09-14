@@ -1,4 +1,4 @@
-# Installation profiles in v1.3.1
+# Installation profiles in v1.4.0
 
 The verified `.run` asset contains the portable coordinator and the qualified
 reference transaction adapter. Choose one graph owner; the installer does not
@@ -44,7 +44,7 @@ publish or download this release.
 
 The established `install --device <whole-disk-by-id> --protect-mount /mnt/data`
 interface remains. Add `--timeshift` only if needed. Existing v1.0.0 through
-v1.3.0 installations use the asset without arguments to upgrade in place.
+v1.3.1 installations use the asset without arguments to upgrade in place.
 Supported configuration and the existing portable ordinary/Hibernate contracts
 are preserved. Automatic generic blocker termination is a feature of the
 explicit reference transaction profile, not the portable read-only gadget gate.
@@ -64,3 +64,24 @@ and records an exact rollback snapshot. It never runs host adapters or systemd.
 Its result is labeled `ISOLATED_PAYLOAD_ONLY`: it proves packaging and rollback,
 not fresh physical hardware acceptance or compatibility of an arbitrary host's
 legacy stack. The automated and built-asset acceptance cover both profiles.
+
+## Qualified reference Hibernate extension
+
+After the reference prerequisites are established, use the verified v1.4.0 asset:
+
+```bash
+sudo ./aag-external-storage-safe-suspend-linux-v1.4.0.run hibernate --config <private-hibernate-config> --gates <verified-gates-json> --baseline <accepted-baseline-json> --report <private-report-directory>
+```
+
+The baseline JSON is a list of installed absolute paths and expected SHA256
+hashes. The gate JSON and runtime configuration must match the reviewed simulation
+and regression results for this host. Do not fabricate gates to enable deployment.
+This route invokes the unchanged qualified S4 deployer; it never requests sleep.
+Use `hibernate-readiness` afterward to inspect the live GO gates. The detailed
+[Hibernate contract](hibernate-transaction.md) defines the hardware, memory,
+resume image, owner and restoration scope. An existing accepted installation
+needs no redeployment for release publication.
+
+The Hibernate route also accepts `--root <temporary-prefix> --test-mode` for
+isolated payload/rollback validation. That result is not physical qualification
+of the target host. Never use the portable install command over a reference graph.

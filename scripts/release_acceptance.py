@@ -12,8 +12,10 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import deploy_hibernate
+
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.3.1"
+VERSION = "1.4.0"
 
 
 def sha256(path: Path) -> str:
@@ -34,9 +36,144 @@ def run(argv: list[str], expected: int = 0) -> subprocess.CompletedProcess[str]:
     return result
 
 
+def previous_release_acceptance(asset: Path, previous: Path, directory: Path) -> None:
+    """Use actual verified previous-release bytes, not a reconstructed fixture."""
+    previous_copy = directory / "previous-release.run"
+    shutil.copyfile(previous, previous_copy)
+    previous_copy.chmod(0o755)
+    if sha256(previous_copy) != sha256(previous):
+        raise RuntimeError("previous-release working copy differs from preserved asset")
+    previous = previous_copy
+    root = directory / "public-v1.3.1-root"
+    root.mkdir()
+    run([str(previous), "verify-source"])
+    common = ["--root", str(root), "--test-mode"]
+    run([str(previous), *common, "install", "--config", str(ROOT / "tests/fixtures/config.json")])
+    state_path = root / "var/lib/aag-external-storage-safe-suspend/install-state.json"
+    before = json.loads(state_path.read_text())
+    if before["installed_version"] != "1.3.1":
+        raise RuntimeError("previous asset is not the accepted v1.3.1 baseline")
+    originals = {
+        name: (sha256(root / name.lstrip("/")), (root / name.lstrip("/")).stat().st_mode & 0o777)
+        for name in before["files"]
+    }
+    upgraded = run([str(asset), *common, "install"])
+    if f'"installed_version": "{VERSION}"' not in upgraded.stdout:
+        raise RuntimeError("actual previous-release upgrade failed")
+    env = {**os.environ, "AAG_SAFE_SUSPEND_ROOT": str(root), "AAG_SAFE_SUSPEND_TEST_MODE": "1"}
+    cli = root / "usr/local/bin/aag-safe-suspend"
+    result = subprocess.run(
+        [str(cli), "rollback"], env=env, capture_output=True, text=True, timeout=60
+    )
+    if result.returncode or '"to_version": "1.3.1"' not in result.stdout:
+        raise RuntimeError("actual previous-release rollback failed")
+    restored = json.loads(state_path.read_text())
+    if restored["installed_version"] != "1.3.1":
+        raise RuntimeError("rollback did not restore previous version")
+    for name, expected in originals.items():
+        path = root / name.lstrip("/")
+        if (sha256(path), path.stat().st_mode & 0o777) != expected:
+            raise RuntimeError("rollback did not restore exact previous bytes/modes: " + name)
+    version = subprocess.run(
+        [str(cli), "--version"], env=env, capture_output=True, text=True, timeout=30
+    )
+    if version.returncode or version.stdout.strip() != "1.3.1":
+        raise RuntimeError("rolled-back CLI did not execute previous version")
+    run([str(previous), *common, "uninstall"])
+
+
+def hibernate_package_acceptance(asset: Path, root: Path, directory: Path) -> None:
+    """Validate the packaged S4 route on the installed synthetic reference stack."""
+    baseline = []
+    for path in sorted(root.rglob("*")):
+        if path.is_file() and not path.is_symlink():
+            baseline.append(
+                {"installed": "/" + str(path.relative_to(root)), "expected": sha256(path)}
+            )
+    baseline_path = directory / "s4-baseline.json"
+    baseline_path.write_text(json.dumps(baseline))
+    gates = {key: "PASS" for key in deploy_hibernate.REQUIRED_GATES}
+    gates["ROLLBACK_READY"] = "YES"
+    gates_path = directory / "s4-gates.json"
+    gates_path.write_text(json.dumps(gates))
+    config = directory / "s4-config.json"
+    config.write_text(
+        json.dumps(
+            {
+                "simulated_gates": {key: "PASS" for key in deploy_hibernate.REQUIRED_GATES},
+                "pinned_files": {
+                    str(dst): sha256(src)
+                    for src, dst in deploy_hibernate.mapping(config)
+                    if src != config
+                },
+            }
+        )
+    )
+    old = root / "etc/systemd/system/aag-hibernate-wwan-recovery.service"
+    old.write_text("synthetic retired owner rollback fixture\n")
+    old.chmod(0o640)
+    common = [
+        str(asset),
+        "hibernate",
+        "--root",
+        str(root),
+        "--test-mode",
+        "--report",
+        str(directory / "s4-report"),
+    ]
+    receipt = json.loads(
+        run(
+            common
+            + [
+                "--config",
+                str(config),
+                "--gates",
+                str(gates_path),
+                "--baseline",
+                str(baseline_path),
+            ]
+        ).stdout
+    )
+    if receipt["power_actions"] or receipt["status"] != "CANDIDATE_INSTALLED":
+        raise RuntimeError("S4 packaged deployment did not complete without power actions")
+    for source, logical in deploy_hibernate.mapping(config):
+        if sha256(root / logical.relative_to("/")) != sha256(source):
+            raise RuntimeError("packaged S4 runtime differs from qualified source")
+    # Reinstall/rollback must preserve the already-qualified S4 payload exactly.
+    upgrade = json.loads(
+        run(
+            common
+            + [
+                "--config",
+                str(config),
+                "--gates",
+                str(gates_path),
+                "--baseline",
+                str(baseline_path),
+            ]
+        ).stdout
+    )
+    run(common + ["--rollback", upgrade["rollback"]])
+    for source, logical in deploy_hibernate.mapping(config):
+        if sha256(root / logical.relative_to("/")) != sha256(source):
+            raise RuntimeError("S4 update rollback changed the preceding payload")
+    run(common + ["--rollback", receipt["rollback"]])
+    for row in baseline:
+        if sha256(root / row["installed"].lstrip("/")) != row["expected"]:
+            raise RuntimeError("S4 rollback changed the accepted reference baseline")
+    if (
+        old.read_text() != "synthetic retired owner rollback fixture\n"
+        or old.stat().st_mode & 0o777 != 0o640
+    ):
+        raise RuntimeError("S4 rollback did not restore the old owner bytes/mode")
+    if (root / "usr/local/libexec/aag-power-transaction").exists():
+        raise RuntimeError("S4 rollback left the added dispatcher")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("asset", type=Path)
+    parser.add_argument("--previous-asset", type=Path)
     args = parser.parse_args()
     asset = args.asset.resolve()
     if not asset.is_file() or not (asset.stat().st_mode & 0o111):
@@ -158,8 +295,8 @@ def main() -> int:
         upgrade_state_path.write_text(json.dumps(upgrade_state, sort_keys=True, indent=2) + "\n")
         upgrade_state_path.chmod(0o600)
         upgraded = run(upgrade_common + ["install"])
-        if '"installed_version": "1.3.1"' not in upgraded.stdout:
-            raise RuntimeError("v1.1.1 fixture did not upgrade to v1.3.1")
+        if '"installed_version": "1.4.0"' not in upgraded.stdout:
+            raise RuntimeError("v1.1.1 fixture did not upgrade to v1.4.0")
         upgrade_env = {
             **os.environ,
             "AAG_SAFE_SUSPEND_ROOT": str(upgrade_root),
@@ -174,7 +311,7 @@ def main() -> int:
             env=upgrade_env,
         )
         if rolled_back.returncode or '"to_version": "1.1.1"' not in rolled_back.stdout:
-            raise RuntimeError("v1.3.1 rollback did not restore v1.1.1")
+            raise RuntimeError("v1.4.0 rollback did not restore v1.1.1")
         run(upgrade_common + ["uninstall"])
 
         # Exercise the patch-release boundary separately.  This sanitized
@@ -240,7 +377,7 @@ def main() -> int:
             del patch_state["files"][logical]
         init_logical = "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/__init__.py"
         init_path = patch_root / init_logical.removeprefix("/")
-        init_path.write_text(init_path.read_text().replace('"1.3.1"', '"1.2.0"'))
+        init_path.write_text(init_path.read_text().replace('"1.4.0"', '"1.2.0"'))
         patch_state["files"][init_logical]["sha256"] = sha256(init_path)
         patch_state.update(
             installed_version="1.2.0",
@@ -256,8 +393,8 @@ def main() -> int:
         patch_state_path.write_text(json.dumps(patch_state, sort_keys=True, indent=2) + "\n")
         patch_state_path.chmod(0o600)
         patch_upgrade = run(patch_common + ["install"])
-        if '"installed_version": "1.3.1"' not in patch_upgrade.stdout:
-            raise RuntimeError("v1.2.0 fixture did not upgrade to v1.3.1")
+        if '"installed_version": "1.4.0"' not in patch_upgrade.stdout:
+            raise RuntimeError("v1.2.0 fixture did not upgrade to v1.4.0")
         if not (patch_root / new_paths[0].removeprefix("/")).is_file():
             raise RuntimeError("v1.2.0 upgrade omitted the ordinary USBClone unit")
         patch_env = {
@@ -274,11 +411,11 @@ def main() -> int:
             env=patch_env,
         )
         if patch_rollback.returncode or '"to_version": "1.2.0"' not in patch_rollback.stdout:
-            raise RuntimeError("v1.3.1 rollback did not restore v1.2.0")
+            raise RuntimeError("v1.4.0 rollback did not restore v1.2.0")
         if dropin_path.read_bytes() != old_dropin:
             raise RuntimeError("v1.2.0 ordinary graph bytes were not restored")
         if (patch_root / new_paths[0].removeprefix("/")).exists():
-            raise RuntimeError("v1.2.0 rollback retained the v1.3.1 ordinary unit")
+            raise RuntimeError("v1.2.0 rollback retained the v1.4.0 ordinary unit")
         run(patch_common + ["uninstall"])
 
         # Exercise the packaged reference-adapter dispatch, not just module tests.
@@ -310,6 +447,12 @@ def main() -> int:
         )
         if sha256(runtime) != sha256(ROOT / "src/aag_safe_suspend/production.py"):
             raise RuntimeError("packaged transaction runtime differs from qualified source")
+        reference_init = (
+            reference_root / "usr/local/lib/aag-sleep-transaction/aag_safe_suspend/__init__.py"
+        )
+        if sha256(reference_init) != sha256(ROOT / "src/reference-transaction-init.py"):
+            raise RuntimeError("release metadata replaced the qualified reference package")
+        hibernate_package_acceptance(asset, reference_root, Path(temporary))
         restored = json.loads(run(reference_common + ["--rollback", reference["rollback"]]).stdout)
         if restored["status"] != "ROLLBACK_COMPLETE" or safety.read_text() != original_safety:
             raise RuntimeError("packaged transaction rollback did not restore fixture")
@@ -325,12 +468,18 @@ def main() -> int:
         if "checksum mismatch" not in refused.stderr.lower():
             raise RuntimeError("corrupt release payload did not fail at its checksum")
 
+        if args.previous_asset:
+            previous_release_acceptance(asset, args.previous_asset.resolve(), Path(temporary))
+
     print("SELF_EXTRACT_CHECKSUM=PASS")
     print("RELEASE_INSTALLER_TEST=PASS")
     print("RELEASE_ROLLBACK_TEST=PASS")
-    print("UPGRADE_1_1_1_TO_1_3_1=PASS")
-    print("UPGRADE_1_2_0_TO_1_3_1=PASS")
+    print("UPGRADE_1_1_1_TO_1_4_0=PASS")
+    print("UPGRADE_1_2_0_TO_1_4_0=PASS")
     print("REFERENCE_TRANSACTION_PAYLOAD_AND_ROLLBACK=PASS")
+    print("REFERENCE_HIBERNATE_PAYLOAD_AND_ROLLBACK=PASS")
+    if args.previous_asset:
+        print("ACTUAL_PUBLIC_V1_3_1_UPGRADE_AND_ROLLBACK=PASS")
     print("POWER_STATE_ACTIONS=NONE")
     return 0
 
