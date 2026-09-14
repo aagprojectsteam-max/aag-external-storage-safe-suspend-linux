@@ -19,6 +19,7 @@ EXCLUDED_PARTS = {
     "build",
     "dist",
     "release-work",
+    "reports",
 }
 TEXT_SUFFIXES = {
     "",

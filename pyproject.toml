@@ -1,6 +1,6 @@
 [project]
 name = "aag-external-storage-safe-suspend-linux"
-version = "1.2.1"
+version = "1.3.0"
 description = "Fail-closed external storage release around Linux suspend"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,6 +12,14 @@ Homepage = "https://github.com/aagprojectsteam-max/aag-external-storage-safe-sus
 Issues = "https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/issues"
 
 [tool.ruff]
+# Qualified runtime bytes are locked by docs/transaction-runtime-sha256.json.
+# Release validation checks those hashes instead of reformatting deployed code.
+extend-exclude = [
+    "src/aag_safe_suspend/production.py",
+    "src/aag_safe_suspend/transaction.py",
+    "src/aag_safe_suspend/workloads.py",
+    "src/aag_safe_suspend/locklock_compat.py",
+]
 target-version = "py310"
 line-length = 100
 
@@ -21,3 +29,9 @@ ignore = ["SIM108"]
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/install.py" = ["E402"]
+
+"scripts/deploy_transaction.py" = ["E402"]
+"scripts/accept_transaction.py" = ["E402"]
+# Keep nested assertion/mocking contexts explicit in the accepted regression corpus.
+"tests/test_transaction.py" = ["SIM117"]
+"tests/test_blocker_policy.py" = ["SIM117"]

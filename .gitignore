@@ -9,3 +9,6 @@ build/
 dist/
 release-work/
 *.log
+
+# Private host diagnostics and publication evidence stay local.
+/reports/

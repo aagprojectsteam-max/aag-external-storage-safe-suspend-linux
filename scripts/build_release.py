@@ -14,9 +14,9 @@ import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.2.1"
+VERSION = "1.3.0"
 PROJECT = "aag-external-storage-safe-suspend-linux"
-EPOCH = 1788998400  # 2026-09-10T00:00:00Z
+EPOCH = 1789344000  # 2026-09-14T00:00:00Z
 EXCLUDES = {
     ".git",
     ".mypy_cache",
@@ -27,6 +27,8 @@ EXCLUDES = {
     "build",
     "dist",
     "release-work",
+    "reports",
+    "PAYLOAD-SHA256SUMS",
 }
 
 
@@ -105,10 +107,15 @@ mkdir "$WORK/tree"
 tar -xzf "$WORK/payload.tar.gz" -C "$WORK/tree"
 (cd "$WORK/tree" && sha256sum -c PAYLOAD-SHA256SUMS >/dev/null)
 INSTALLER_SHA256="$(sha256sum "$SELF" | awk '{{print $1}}')"
+ENTRYPOINT="$WORK/tree/scripts/install.py"
+if [ "${{1-}}" = "transaction" ]; then
+    shift
+    ENTRYPOINT="$WORK/tree/scripts/transaction_package.py"
+fi
 AAG_RELEASE_SOURCE="GITHUB_RELEASE_VERIFIED_PAYLOAD" \
 AAG_RELEASE_PAYLOAD_SHA256="$PAYLOAD_SHA256" \
 AAG_RELEASE_INSTALLER_SHA256="$INSTALLER_SHA256" \
-/usr/bin/python3 "$WORK/tree/scripts/install.py" "$@"
+/usr/bin/python3 "$ENTRYPOINT" "$@"
 exit 0
 __AAG_PAYLOAD_BELOW__
 '''
@@ -142,7 +149,7 @@ def build() -> dict[str, object]:
     release_manifest = {
         "product": PROJECT,
         "version": VERSION,
-        "release_date": "2026-09-10",
+        "release_date": "2026-09-14",
         "source_date_epoch": EPOCH,
         "minimum_upgrader_schema": 1,
         "upgrader_schema": 2,
@@ -151,7 +158,7 @@ def build() -> dict[str, object]:
         "migration_schema": 3,
         "systemd_wiring_revision": 3,
         "udev_rule_revision": 1,
-        "supported_upgrade_from": [">=1.0.0,<1.2.1"],
+        "supported_upgrade_from": [">=1.0.0,<1.3.0"],
         "supported_downgrade_from": [],
         "migration_ids": [
             "bootstrap-public-v1.0.0-to-installed-state-v1",
@@ -161,6 +168,14 @@ def build() -> dict[str, object]:
             "wiring-revision-2-to-3-ordinary-usbclone-gate",
             "adopt-accepted-reference-hibernate-qualification-v1",
         ],
+        "transaction_adapter": {
+            "installer_command": "transaction",
+            "scope": "QUALIFIED_EXISTING_V2_T700_LOCKLOCK_STACK",
+            "automatic_portable_conversion": False,
+            "accepted_implementation_commit": "18c23506f89943af65e62c6cce24d45462515994",
+            "runtime_sha256_manifest": "docs/transaction-runtime-sha256.json",
+            "actual_physical_lid_acceptance": "PASS",
+        },
         "ordinary_suspend": {
             "usbclone_gate": "ENABLED_FAIL_CLOSED",
             "loaded_dummy_hcd_without_bound_device": "ALLOWED",
@@ -182,6 +197,10 @@ def build() -> dict[str, object]:
 
 
 def validate_only() -> dict[str, object]:
+    accepted = json.loads((ROOT / "docs/transaction-runtime-sha256.json").read_text())
+    for name, expected in accepted["sha256"].items():
+        if digest((ROOT / name).read_bytes()) != expected:
+            raise RuntimeError("qualified runtime bytes changed: " + name)
     paths = public_files()
     required = {
         Path("README.md"),
@@ -189,6 +208,11 @@ def validate_only() -> dict[str, object]:
         Path("SECURITY.md"),
         Path("CONTRIBUTING.md"),
         Path("scripts/install.py"),
+        Path("scripts/transaction_package.py"),
+        Path("scripts/deploy_transaction.py"),
+        Path("src/aag-sleep-transaction"),
+        Path("src/aag_safe_suspend/production.py"),
+        Path("docs/transaction-runtime-sha256.json"),
         Path("src/aag_safe_suspend/maintenance.py"),
         Path("systemd/aag-external-storage-safe-suspend.service"),
         Path("udev/99-aag-external-storage-safe-suspend.rules.in"),

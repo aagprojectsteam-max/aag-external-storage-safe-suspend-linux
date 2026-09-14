@@ -1,5 +1,24 @@
 # In-place upgrades
 
+## v1.2.1 to v1.3.0 and profile selection
+
+The portable upgrade preserves schema 2, wiring revision 3, configuration and
+the existing ordinary/Hibernate graph. It refreshes the public payload and
+version, including the adapter modules, without enabling reference-specific
+services. The new `transaction` installer route is explicit and requires the
+reviewed existing V2/T700/LockLock dependencies and private host policy. It
+applies the accepted deployment mapping and saves exact-file rollback.
+
+For a reference deployment, run the verified v1.3.0 asset with `transaction`,
+`--config`, and a private `--report`, beginning with `--check`. An already
+accepted installation needs no reinstall solely for publication. Do not run
+the portable installer over the reference graph to enable the new behavior.
+See [installation](INSTALLATION.md) and [rollback](ROLLBACK.md).
+
+The release validates a real downloaded v1.2.1 portable asset upgrade and
+rollback in an isolated root, plus the packaged reference file mapping and
+rollback in another isolated root. Neither exercise alters the production host.
+
 ## Normal update path
 
 Download the target release's `.run`, `SHA256SUMS`, and
@@ -9,8 +28,8 @@ run it directly. An existing supported installation is detected automatically;
 
 ```bash
 sha256sum --ignore-missing -c SHA256SUMS
-chmod +x aag-external-storage-safe-suspend-linux-v1.2.1.run
-sudo ./aag-external-storage-safe-suspend-linux-v1.2.1.run
+chmod +x aag-external-storage-safe-suspend-linux-v1.3.0.run
+sudo ./aag-external-storage-safe-suspend-linux-v1.3.0.run
 ```
 
 The installer reports `FRESH_INSTALL`, `SAME_VERSION`, `UPGRADE`, or a precise
@@ -57,7 +76,7 @@ Hibernate defaults to disabled during an ordinary migration. On the documented
 reference platform, opt in during the same transaction with:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.2.1.run install \
+sudo ./aag-external-storage-safe-suspend-linux-v1.3.0.run install \
   --enable-reference-hibernate
 sudo aag-safe-suspend health-check
 ```

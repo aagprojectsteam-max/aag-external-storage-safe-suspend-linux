@@ -34,7 +34,7 @@ class ReleaseMetadataTests(unittest.TestCase):
                     "migration_schema": 3,
                     "systemd_wiring_revision": 3,
                     "udev_rule_revision": 1,
-                    "supported_upgrade_from": [">=1.0.0,<1.2.1"],
+                    "supported_upgrade_from": [">=1.0.0,<1.3.0"],
                     "supported_downgrade_from": [],
                     "migration_ids": [
                         "bootstrap-public-v1.0.0-to-installed-state-v1",
@@ -44,6 +44,12 @@ class ReleaseMetadataTests(unittest.TestCase):
                         "wiring-revision-2-to-3-ordinary-usbclone-gate",
                         "adopt-accepted-reference-hibernate-qualification-v1",
                     ],
+                    "transaction_adapter": {
+                        "installer_command": "transaction",
+                        "scope": "QUALIFIED_EXISTING_V2_T700_LOCKLOCK_STACK",
+                        "automatic_portable_conversion": False,
+                        "accepted_implementation_commit": "18c23506f89943af65e62c6cce24d45462515994",
+                    },
                     "ordinary_suspend": {
                         "usbclone_gate": "ENABLED_FAIL_CLOSED",
                         "loaded_dummy_hcd_without_bound_device": "ALLOWED",
@@ -63,7 +69,7 @@ class ReleaseMetadataTests(unittest.TestCase):
 
     def test_consistent_release_metadata_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            result = validate_release.validate(self.fixture(Path(temporary)), "v1.2.1")
+            result = validate_release.validate(self.fixture(Path(temporary)), "v1.3.0")
         self.assertEqual(result["status"], "PASS")
 
     def test_asset_and_metadata_mismatch_fails(self) -> None:

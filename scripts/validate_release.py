@@ -8,7 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from build_release import PROJECT, ROOT, VERSION
+from build_release import PROJECT, ROOT, VERSION, validate_only
 
 
 def sha256(path: Path) -> str:
@@ -16,6 +16,7 @@ def sha256(path: Path) -> str:
 
 
 def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
+    validate_only()
     manifest = json.loads((dist / "release-manifest.json").read_text())
     required = {
         "product",
@@ -34,6 +35,7 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         "release_date",
         "hibernate",
         "ordinary_suspend",
+        "transaction_adapter",
     }
     missing = sorted(required - set(manifest))
     if missing:
@@ -53,8 +55,8 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         or manifest["migration_schema"] != 3
         or manifest["systemd_wiring_revision"] != 3
     ):
-        raise RuntimeError("v1.2.1 schema or wiring metadata is inconsistent")
-    if ">=1.0.0,<1.2.1" not in manifest["supported_upgrade_from"]:
+        raise RuntimeError("v1.3.0 schema or wiring metadata is inconsistent")
+    if ">=1.0.0,<1.3.0" not in manifest["supported_upgrade_from"]:
         raise RuntimeError("public v1.0.0 bootstrap compatibility is not declared")
     required_migrations = {
         "bootstrap-public-v1.0.0-to-installed-state-v1",
@@ -79,6 +81,18 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         "active_guest_usb_detach": "NEVER_AUTOMATIC",
     }:
         raise RuntimeError("ordinary-suspend USBClone scope is inconsistent")
+    transaction = manifest["transaction_adapter"]
+    if (
+        transaction.get("installer_command") != "transaction"
+        or transaction.get("scope") != "QUALIFIED_EXISTING_V2_T700_LOCKLOCK_STACK"
+        or transaction.get("automatic_portable_conversion") is not False
+    ):
+        raise RuntimeError("transaction adapter packaging scope mismatch")
+    if (
+        transaction.get("accepted_implementation_commit")
+        != "18c23506f89943af65e62c6cce24d45462515994"
+    ):
+        raise RuntimeError("accepted implementation identity mismatch")
     assets = manifest["assets"]
     if not isinstance(assets, dict) or not assets:
         raise RuntimeError("release assets are missing")

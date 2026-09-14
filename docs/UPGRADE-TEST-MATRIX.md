@@ -45,3 +45,19 @@ external owner-verified shutdown, preservation of existing T700 latches,
 semantic dependency-set normalization, command/drop-in change rejection,
 Hibernate isolation, UGREEN/internal-storage invariants, idempotence, injected
 failure cleanup, upgrade, and rollback. No test invokes a power or USB action.
+
+## v1.3.0 publication validation
+
+The candidate adds isolated reference payload installation, all mapped hashes
+and permissions, exact upgrade/rollback, rollback corruption refusal, symlink
+escape refusal, private-report exclusion and qualified-runtime hash enforcement.
+The built `.run transaction` dispatch is exercised as well as the existing
+portable installer. A separately downloaded public v1.2.1 asset provides the
+real previous-version install for isolated upgrade and rollback verification.
+Live production deployment and physical suspend are not repeated for packaging.
+
+The full v1.3.0 suite contains 209 passing tests. The actual public v1.2.1
+upgrade/rollback test verifies 31 prior files and permissions, removes four
+new module files on rollback, checks exact configuration preservation and
+validates version/health before and after restoration. A deterministic cache
+collision regression and symlink-refusal test cover the maintenance correction.

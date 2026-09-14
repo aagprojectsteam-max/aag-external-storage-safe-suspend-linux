@@ -523,11 +523,37 @@ def installer_lock(root: Path | None = None, *, blocking: bool = False) -> Itera
             fcntl.flock(stream, fcntl.LOCK_UN)
 
 
+def invalidate_bytecode(destination: Path, *, expected_uid: int | None = None) -> None:
+    """Discard only this managed module's derived caches after replacement.
+
+    Timestamp-based pyc headers use whole seconds and source size. An upgrade
+    and rollback within one second can otherwise execute the wrong version.
+    Cache directories and entries must pass the same ownership safety checks.
+    """
+    if destination.suffix != ".py":
+        return
+    owner = _expected_uid() if expected_uid is None else expected_uid
+    directory = destination.parent / "__pycache__"
+    if not directory.exists() and not directory.is_symlink():
+        return
+    info = directory.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != owner:
+        raise MaintenanceError("unsafe module bytecode directory")
+    entries = list(directory.glob(destination.stem + ".*.pyc"))
+    for entry in entries:
+        cached = entry.lstat()
+        if not stat.S_ISREG(cached.st_mode) or cached.st_uid != owner:
+            raise MaintenanceError("unsafe module bytecode entry")
+    for entry in entries:
+        entry.unlink(missing_ok=True)
+
+
 def _atomic_copy(source: Path, destination: Path, mode: int) -> None:
     _safe_regular(source)
     destination.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     if destination.parent.is_symlink():
         raise MaintenanceError(f"unsafe destination parent: {destination.parent}")
+    invalidate_bytecode(destination)
     fd, temporary = tempfile.mkstemp(prefix=".aag-maintenance-", dir=destination.parent)
     try:
         with source.open("rb") as incoming, os.fdopen(fd, "wb", closefd=False) as outgoing:
@@ -540,6 +566,7 @@ def _atomic_copy(source: Path, destination: Path, mode: int) -> None:
         os.close(fd)
         fd = -1
         os.replace(temporary, destination)
+        invalidate_bytecode(destination)
     finally:
         if fd >= 0:
             os.close(fd)
@@ -624,6 +651,7 @@ class _LocalTransaction:
     def remove(self, destination: Path) -> None:
         self.backup(destination)
         destination.unlink(missing_ok=True)
+        invalidate_bytecode(destination)
 
     def rollback(self) -> None:
         errors: list[str] = []
@@ -631,6 +659,7 @@ class _LocalTransaction:
             try:
                 if backup is None:
                     destination.unlink(missing_ok=True)
+                    invalidate_bytecode(destination)
                 else:
                     _atomic_copy(backup, destination, stat.S_IMODE(backup.stat().st_mode))
             except Exception as exc:

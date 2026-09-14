@@ -711,6 +711,7 @@ class Installer:
         self.backup(logical)
         target = self.target(logical)
         self.ensure_directory(target.parent)
+        maintenance.invalidate_bytecode(target, expected_uid=os.getuid() if self.test_mode else 0)
         fd, temporary = tempfile.mkstemp(prefix=".aag-install-", dir=target.parent)
         try:
             remaining = memoryview(content)
@@ -726,6 +727,10 @@ class Installer:
             os.close(fd)
             fd = -1
             os.replace(temporary, target)
+            self.mutated.append(logical)
+            maintenance.invalidate_bytecode(
+                target, expected_uid=os.getuid() if self.test_mode else 0
+            )
             directory_fd = os.open(target.parent, os.O_RDONLY | os.O_DIRECTORY)
             try:
                 os.fsync(directory_fd)
@@ -736,7 +741,6 @@ class Installer:
                 os.close(fd)
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(temporary)
-        self.mutated.append(logical)
 
     def install_file(self, logical: Path, source: Path, mode: int) -> None:
         if not source.is_file() or source.is_symlink():
@@ -756,6 +760,9 @@ class Installer:
             else:
                 with contextlib.suppress(FileNotFoundError):
                     target.unlink()
+            maintenance.invalidate_bytecode(
+                target, expected_uid=os.getuid() if self.test_mode else 0
+            )
         if self.timeshift_diversion_added:
             self.remove_timeshift_diversion(best_effort=True)
         if not self.test_mode:
@@ -1145,7 +1152,7 @@ class Installer:
                 "payload_cache": payload_cache,
                 "rollback": rollback,
                 "compatibility": {
-                    "upgrade_from": ">=1.0.0,<1.2.1",
+                    "upgrade_from": ">=1.0.0,<1.3.0",
                     "downgrade": "explicit-compatible-snapshot-only",
                     "runtime_architecture": (
                         "ordinary-usbclone-gate-v1+suspend-contract-v1+plain-hibernate-reference-v1"

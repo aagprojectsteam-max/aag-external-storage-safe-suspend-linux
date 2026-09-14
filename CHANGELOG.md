@@ -3,6 +3,25 @@
 All notable changes are documented here. This project follows Semantic
 Versioning.
 
+## 1.3.0 — 2026-09-14
+
+- Publish the qualified reference-host transaction owner with stale-failure
+  reconciliation, transaction-scoped retries and repeated lid-request control.
+- Add generic safe ordinary-userspace blocker handling, preferred checkpoint
+  APIs, critical-component exclusions and supported guest shutdown integration.
+- Preserve DATA/UGREEN release auditing, verify actual kernel sleep and hardware
+  residency, and require validated restoration before COMPLETE.
+- Remove timer/retry exhaustion as an ordinary fail-safe poweroff trigger while
+  preserving real thermal/battery safety supervision.
+- Package the accepted adapter behind an explicit `transaction` installer route;
+  keep portable v1.x interfaces and schemas compatible without automatic conversion.
+- Pin qualified runtime bytes, exclude private reports from release payloads,
+  and add isolated payload/permission/upgrade/rollback/privacy tests.
+- Fix stale Python bytecode after rapid portable upgrade/rollback by invalidating
+  only the replaced managed module caches; test exact version recovery.
+- Record one successful physical lid-close/open cycle with 112.615150 seconds
+  of confirmed sleep and 21 passing FM350/T700 checks; publish no raw evidence.
+
 ## 1.2.1 — 2026-09-10
 
 - Add an ordinary-suspend-only, read-only gate for active ConfigFS gadgets and

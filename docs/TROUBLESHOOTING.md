@@ -1,5 +1,34 @@
 # Troubleshooting
 
+## v1.3.0 reference transaction adapter
+
+Identify the profile first. The reference adapter records the episode, stage,
+first failure, process stop receipts, kernel entry/exit and actual sleep. A
+successful systemd request alone is not a completed sleep. Inspect the relevant
+AAG storage, native suspend, resume-check and failure-recovery units and the
+private transaction state. Preserve and sanitize evidence before sharing it.
+
+Stale FAILURE_PENDING is reconciled by the owner. Do not delete a live fence,
+T700 latch or automount marker, or start repeated suspend requests to clear it.
+A live critical blocker with no supported safe shutdown remains an explicit
+exception. Ordinary userspace does not require an app allowlist; failed safe
+release is diagnosed from exact resource ownership.
+
+`CHECKPOINT_API_INCOMPLETE` means the preferred API was unavailable; the exact
+resource-audit fallback still runs. Do not report a successful checkpoint merely
+because suspend completed. Guest/USB Clone profiles and workloads configured
+with never-auto-restart intentionally remain stopped after resume.
+
+A closed-lid wake is not a lid-open pass. Measured hardware sleep and validated
+storage/device recovery are required; a retry remains bounded to its episode.
+Genuine thermal/battery conditions retain safety supervision; ordinary timer
+expiry or exhausted retries no longer cause normal recovery poweroff.
+
+## Portable profile
+
+The remaining guidance describes the portable coordinator and its conservative
+read-only USBClone gate.
+
 ## Installer refuses a systemd job
 
 The installer continuously observes the systemd job queue. Power, storage,

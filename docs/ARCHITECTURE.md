@@ -1,5 +1,30 @@
 # Architecture
 
+## v1.3.0 qualified transaction owner
+
+The reference adapter owns the complete ordinary-suspend lifecycle around the
+existing V2 storage/T700/LockLock stack. PREPARING_SLEEP resolves actual blockers;
+SLEEP_COMMITTED follows independent storage release; SUSPEND_REQUESTED records
+the native invocation; VERIFYING_RESUME requires kernel/counter/residency proof;
+COMPLETE is followed by IDLE only after device/storage/consumer restoration.
+Callbacks and retry tokens are scoped to the episode and service invocation.
+Abandoned state is reconciled before a new owner is admitted. A low-level lid
+inhibitor coalesces recovery requests; one exhausted retry does not authorize
+poweroff at normal safety conditions.
+
+Exact ordinary userspace blockers use preferred APIs or bounded TERM/KILL after
+identity and privilege revalidation, without an application allowlist. Critical
+components require supported safe stop and never receive the generic forced
+fallback. The independent storage audit remains decisive. See
+[the full adapter contract](TRANSACTION-ADAPTER.md) and the pinned runtime SHA256
+manifest. The public package version is metadata; qualified runtime and unit
+bytes remain the accepted implementation.
+
+## Portable profile architecture
+
+The remaining sections describe the existing portable profile. v1.3.0 does not
+automatically convert that graph into the reference integration.
+
 ## Boundary and invariants
 
 The coordinator is inserted into the existing `systemd-suspend.service`

@@ -1,0 +1,17 @@
+{
+  "accepted_implementation_commit": "18c23506f89943af65e62c6cce24d45462515994",
+  "sha256": {
+    "src/aag-sleep-transaction": "e11edbd087b9017f09ccc36e10362b8ba72917c5208e07300d1da744b0e4789c",
+    "src/aag_safe_suspend/locklock_compat.py": "1702d7a7c6b0af6481d290f4c49cef5b4535bfb63a8ea774721a49033b335ad0",
+    "src/aag_safe_suspend/production.py": "2ca9edc1590abe6a2dae4dbc5e2070de5a920a23a49636217f8c096ee525da41",
+    "src/aag_safe_suspend/transaction.py": "9de9867ce79b38090bbaec0d8e0cbac2922aa8a1ce8f5c7b6732ee33438337f4",
+    "src/aag_safe_suspend/workloads.py": "620cfbfbfb384e1cfd5e701877638e50af8bd22311380692ddf9001e53edfeb4",
+    "systemd/production/aag-sleep-transaction-boot.service": "4ad754ec24c48d21b69cc5207a494d72c85259cfaf0392fe7db6d283109ed14b",
+    "systemd/production/failure.conf": "c8fec0da7c3319a71e118bd2f8e186d5362e81013cb7bc12c402c90193e58213",
+    "systemd/production/native.conf": "65c8921cce8a4ba06ab3e6d4672ec7532297c26f2e82df98f6e4233f8aab94ac",
+    "systemd/production/resume.conf": "b3aed410021b4b31db74eec229095a241607eb156cf84edb5fbfb4c287102a5a",
+    "systemd/production/retry.conf": "846a986e1feeba6cc85b7a256028d7c1ccef24682b8498a0f3e75387fa08ad34",
+    "systemd/production/storage.conf": "ebb97e5c1856ba3dac59d13ae43a58318e767bde6e20ed1e2bfde14b077a024a",
+    "systemd/production/touchpad.conf": "f1defe34b68b98154ed4e4e5b3a10e8f490067a9daf762c36e07f580925efafc"
+  }
+}

@@ -3,272 +3,149 @@
 [![CI](https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/actions/workflows/ci.yml/badge.svg)](https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-`aag-external-storage-safe-suspend-linux` protects one explicitly selected
-external backup disk across ordinary Linux suspend and qualified plain
-Hibernate. It cleanly releases the
-external filesystems before sleep, keeps designated internal storage mounted,
-and closes the GNOME/udisks automount race after the USB bridge re-enumerates on
-resume.
+**v1.3.0 adds the physically validated AAG sleep transaction adapter.** On the
+qualified reference installation, normal lid closure now completes one owned
+suspend transaction, safely resolves eligible blockers, verifies actual kernel
+sleep, and restores storage, modem policy and the desktop session.
 
-Version 1.2.1 also blocks ordinary suspend before any integration hook when a
-ConfigFS gadget is bound to a dummy-HCD virtual USB device. Loaded, empty
-dummy-HCD controllers remain allowed. The gate is read-only and never unbinds a
-gadget, detaches USB storage, or signals a WinBoat/QEMU guest.
+A storage-preparation refusal could leave failure state unreconciled. Repeated
+lid-triggered suspend requests could then exhaust the retry budget and reach
+the fail-safe poweroff path. The new adapter owns preparation through final
+completion, reconciles stale failures, scopes retries to that transaction, and
+coalesces overlapping lid requests. Ordinary recoverable blockers no longer
+reach poweroff merely because a timer expired or a retry was consumed.
 
-It is for Ubuntu desktop users whose USB-attached NVMe backup storage can
-disconnect or re-enumerate during s2idle. Suspending while backup writers,
-hidden mount-namespace users, raw block consumers, or newly automounted
-filesystems still own that device risks an unclean release. This project adds a
-fail-closed transaction around the native suspend path; it does not replace
-backups or fix controller firmware.
+## Choose the installation profile
 
-## What happens
+| Profile | Requirements and behavior |
+|---|---|
+| Qualified transaction adapter, new in v1.3.0 | Existing reviewed AAG V2 storage guard, recovery auditor, T700 integration and LockLock; private host configuration pins adapters by SHA256. Includes the accepted end-to-end remediation. |
+| Portable storage coordinator | Existing public v1.x install/upgrade interface for a selected external disk. Retains its conservative read-only USBClone gate and separate opt-in reference Hibernate support. It does not automatically become the qualified transaction stack. |
 
-```mermaid
-flowchart TD
-    A[Ordinary suspend requested] --> A2{Bound virtual USB device?}
-    A2 -- Yes --> X0[Fail closed before fence or T700 hook]
-    A2 -- No --> B[Arm backup-start fence]
-    B --> B2[Arm target-only automount marker]
-    B2 --> C{Managed backup active?}
-    C -- Yes --> D[Request configured graceful quiesce]
-    D --> D2[Wait while measured progress continues]
-    C -- No --> E[Resolve exact external device generation]
-    D2 --> E
-    E --> F[Three-pass owner and namespace audit]
-    F -->|Unknown or genuine owner| X[Fail closed; preserve session and device]
-    F -->|Host mount only| G[Clean unmount; never force or lazy]
-    G --> H[Re-resolve identity and re-audit]
-    H --> I[Native systemd suspend]
-    I --> J[Resume and USB re-enumeration window]
-    J --> K[Target-only udisks suppression remains active]
-    K --> L[Terminal identity, owner, mount, and internal-storage re-audit]
-    L -->|Safe terminal| M[Release fence and suppression]
-    L -->|Race or owner| X
-```
+The `.run` and source archive contain both profiles. They are distinct owners of
+the native suspend graph: do not layer them together or assume that a normal
+portable upgrade enables the new reference-host adapter. Unreviewed legacy
+helpers and machine configuration are not bundled. See
+[installation and prerequisites](docs/INSTALLATION.md).
 
-- Internal mounts listed with `--protect-mount` are identity-checked and never
-  unmounted.
-- The ordinary-only USBClone gate distinguishes loaded empty dummy-HCD
-  controllers from an active bound gadget. Unknown ConfigFS ownership or an
-  orphan dummy-HCD USB device also fails closed.
-- The external device is selected by underlying serial, USB bridge IDs, and the
-  exact filesystem UUID set. A current `/dev/sdX` name is only an action handle
-  after identity and kernel-generation checks.
-- Mount namespaces and open file, cwd, root, executable, mmap, raw block,
-  DM/NBD/loop, container, and guest relationships are audited.
-- Stable host mounts and propagated Snap/systemd sandbox mirrors are not
-  mistaken for independent owners. Permission gaps, changing topology, or real
-  writers fail closed.
-- Managed backup software receives only its configured graceful action. The
-  wait extends while measured progress continues; there is no universal
-  50-second cleanup deadline and no generic `kill -9`.
-- The generated udev rule suppresses udisks automount only for the configured
-  device's exact partitions and only while a boot-scoped transaction marker
-  exists. Unrelated USB media retains normal desktop behavior.
-- The installer and uninstaller never suspend, reboot, shut down, or power off.
+## Transaction behavior
 
-## Tested reference platform
+- A single transaction owns preparation, native suspend, recovery and completion.
+  Stale `FAILURE_PENDING` is reconciled; retry state belongs to the transaction.
+- Overlapping callbacks cannot replace a live owner. Recovery holds the low-level
+  lid inhibitor to prevent repeated logind requests from creating a loop.
+- Known checkpoint/stop APIs are preferred. Unknown ordinary userspace blockers
+  need no application allowlist: exact resource ownership and process identity
+  are revalidated before TERM, a bounded wait and a last-resort safe KILL.
+- Critical system components, databases, filesystem infrastructure and VMs are
+  never blindly killed. A VM requires a configured supported shutdown method;
+  unsafe or incomplete release remains an explicit exception.
+- Known USB Clone profiles are stopped only after guest, backing-file and mount
+  ownership is released. Active guest USB is never forcibly detached.
+- Internal DATA remains mounted and identity-checked. External UGREEN storage
+  retains clean unmount, namespace/owner auditing, generation checks and targeted
+  automount suppression through terminal verification.
+- Command success alone is not sleep: actual kernel entry/exit, suspend counters
+  and hardware residency establish the result. A false resume cannot complete.
+- Real thermal/battery safety supervision remains active. Timer expiry or one
+  consumed retry alone does not order a shutdown.
+- Resume restores saved device policy and required eligible consumers. Workloads
+  with explicit user-stop semantics and safely terminated applications remain
+  stopped for manual restart.
 
-Physical acceptance passed on Ubuntu Desktop 26.04 LTS, GNOME on Wayland,
-s2idle, an external NVMe drive in a UGREEN enclosure using a Realtek RTL9210
-bridge, and optional Timeshift integration. The accepted cycle recorded one PM
-suspend entry and exit, 90.077358 seconds of hardware sleep, zero target
-automounts after resume, all target filesystems unmounted at terminal, unchanged
-internal storage, a continued user session, and zero orderly-poweroff requests.
+[Architecture](docs/ARCHITECTURE.md) · [adapter contract](docs/TRANSACTION-ADAPTER.md)
+· [troubleshooting](docs/TROUBLESHOOTING.md)
 
-See [tested hardware](docs/TESTED-HARDWARE.md) and the normalized
-[acceptance record](docs/ACCEPTANCE.md). Those results validate that reference
-platform, not every enclosure, filesystem, desktop, kernel, or firmware. Plain
-Hibernate is separately physically accepted on that reference platform; it is
-opt-in and guarded by live resume-mapping and capacity checks.
-The v1.2.1 regression acceptance additionally recorded one 72.361356-second
-kernel s2idle cycle and 68.945860 seconds of matching hardware and PMC
-residency, with the USBClone gate, UGREEN terminal state, internal storage,
-T700 verification, and user-session continuation all passing.
-Each release is independently retrieved and verified after publication; the
-versioned verification record is then committed to the default branch. See the
-[v1.2.1 publication verification](docs/PUBLICATION-VERIFICATION-v1.2.1.md).
+## Validated scope
 
-## Install
+The accepted reference implementation passed **201 automated tests** before
+physical acceptance. The release candidate passes **209 tests**, including packaging and maintenance
+regressions. One final physical lid-close/open test under an existing
+workload recorded **112.615150 seconds** of hardware/PMC low-power sleep, one
+suspend transaction, successful resume, DATA/UGREEN restoration and **21 passing
+FM350/T700 checks**. There was no retry loop, stale failure fence or fail-safe
+poweroff; all 15 installed/source manifest entries matched. The desktop recovered.
 
-Download `aag-external-storage-safe-suspend-linux-v1.2.1.run`, `SHA256SUMS`,
-and `release-manifest.json` from the [v1.2.1 release], then verify before running:
+This validates the tested Ubuntu/GNOME/s2idle reference stack, not every Linux
+kernel, enclosure, firmware or workload. A prior user-interrupted cycle was
+excluded from acceptance. Only normalized results are public; raw journals,
+identifiers, private policies and forensic reports remain local.
+
+The optional checkpoint API was unavailable during the final test; the safe
+resource-audit fallback succeeded. Cellular reconnection and IP assignment were
+verified, but separate mobile Internet traffic was not tested. Long-duration and
+Hibernate behavior were not requalified by this release's lid test.
+
+## Verify and install
+
+Download the `.run`, `SHA256SUMS`, and `release-manifest.json` from the
+[v1.3.0 release](https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/releases/tag/v1.3.0):
 
 ```bash
 sha256sum --ignore-missing -c SHA256SUMS
-chmod +x aag-external-storage-safe-suspend-linux-v1.2.1.run
-sudo ./aag-external-storage-safe-suspend-linux-v1.2.1.run install \
-  --device /dev/disk/by-id/your-external-backup-disk \
-  --protect-mount /mnt/data \
-  --timeshift
+chmod +x aag-external-storage-safe-suspend-linux-v1.3.0.run
 ```
 
-`--device` is used once for discovery; the installed configuration never relies
-on that volatile name. Omit `--timeshift` if Timeshift is not part of the backup
-path. Repeat `--protect-mount` for every important internal mount. `/` is always
-protected. The installer validates the discovered stable identity, installed
-hashes, udev syntax, merged systemd graph, and protected mounts, and performs no
-sleep test.
-
-Review status before a first supervised test:
+For an already reviewed reference stack, use its private configuration and a
+private deployment-report directory:
 
 ```bash
-sudo aag-safe-suspend validate
-sudo aag-safe-suspend status
+sudo ./aag-external-storage-safe-suspend-linux-v1.3.0.run transaction   --config /etc/aag-sleep-transaction/config.json   --report /var/lib/aag-sleep-transaction/deployment --check
+sudo ./aag-external-storage-safe-suspend-linux-v1.3.0.run transaction   --config /etc/aag-sleep-transaction/config.json   --report /var/lib/aag-sleep-transaction/deployment
 ```
 
-Close applications that intentionally use the external disk, keep the machine
-on a hard ventilated surface with AC power, and make the first ordinary suspend
-cycle supervised. Do not use a bag or leave the machine unattended until that
-platform's acceptance is complete.
+An already accepted production deployment does not need reinstalling solely
+because these bytes were published. A new host needs an inspected configuration
+and compatible pinned dependencies first; the portable config format cannot be
+used for the reference adapter.
 
-## If a backup or release blocks sleep
-
-A registered Timeshift job cannot start after the fence is armed. An already
-running managed job is asked to quiesce only when an explicit command is
-configured, then is observed with a progress-aware wait. A genuine writer,
-independent namespace, raw consumer, observability gap, identity change, or
-failed clean unmount blocks suspend. The software does not force-unmount or kill
-unknown applications.
-
-Failure recovery preserves the user session. With the default thermal policy,
-even an emergency condition remains fail closed without a power action. An
-opt-in orderly poweroff exists only as a last physical-safety fallback; it is
-not the normal suspend path. See [the safety model](docs/SAFETY-MODEL.md).
-
-## Uninstall and rollback
-
-Use the same verified release asset:
+For a fresh **portable** installation, the existing interface remains:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.2.1.run uninstall
+sudo ./aag-external-storage-safe-suspend-linux-v1.3.0.run install   --device /dev/disk/by-id/your-external-backup-disk   --protect-mount /mnt/data --timeshift
 ```
 
-The uninstaller refuses while the fence or a conflicting systemd job is active,
-checks project-owned hashes, removes only project files, and safely reverses its
-Timeshift diversions. It removes the project device configuration but preserves
-user data and durable transaction evidence. It never performs a power-state
-action.
+Omit `--timeshift` when unused. Protect `/` and every important internal mount.
+The device path is for discovery; stable serial/USB/UUID identity is stored in
+local configuration. Portable v1.0.0 through v1.2.1 upgrades use the verified
+asset without arguments and preserve supported configuration.
 
-## Update in place
+## Upgrade and rollback
 
-Public v1.0.0 through v1.2.0 installations can upgrade directly without
-uninstalling. Verify
-the new release asset as above, then run it with no arguments:
-
-```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.2.1.run
-```
-
-The installer verifies the exact v1.0.0 installation, preserves valid local
-device configuration byte for byte, snapshots the accepted state, applies only
-declared migrations, reloads systemd and udev metadata without starting a power
-operation, runs a non-destructive health check, and commits v1.2.1. Any failure
-before commit automatically restores the exact prior project state.
-
-On the accepted reference machine, the exact final qualification payload is
-recognized and transactionally adopted; its already-accepted plain-Hibernate
-and T700 policy remains enabled. Other upgrades receive disabled Hibernate
-defaults unless `--enable-reference-hibernate` is explicitly supplied.
-
-Maintenance commands are:
+[Upgrade instructions](docs/UPGRADING.md) distinguish the two profiles.
+[Rollback instructions](docs/ROLLBACK.md) describe exact snapshots and refuse
+arbitrary history replacement. The portable maintenance commands remain:
 
 ```bash
 aag-safe-suspend --version
-sudo aag-safe-suspend status
 sudo aag-safe-suspend health-check
-aag-safe-suspend update-check
-sudo aag-safe-suspend repair
 sudo aag-safe-suspend rollback
 ```
 
-The update check is opt-in and reports only; it never installs. Automatic
-download-and-execute is intentionally unavailable in v1.x. See [in-place
-upgrades](docs/UPGRADING.md), the [upgrade test matrix](docs/UPGRADE-TEST-MATRIX.md),
-and the [updater threat model](docs/UPDATER-THREAT-MODEL.md).
-Public artifact checks are recorded in the release publication-verification
-record after independent retrieval.
+The reference adapter uses its recorded deployment backup instead. Neither
+installer performs a suspend test or reboot. The reference deployer may start
+the relevant AAG boot-reconciliation unit and reload idle LockLock when required.
+Do not run another physical test merely to publish an already accepted runtime.
 
-## Plain Hibernate on the reference platform
-
-Plain Hibernate is supported and physically accepted only on the documented
-reference platform. It preserved the running desktop session through a real
-image write, complete power-off, manual power-on, and image restoration. The
-external UGREEN storage received the same clean release, targeted automount
-suppression, and terminal owner audit as ordinary suspend.
-
-Enable the reference policy during a fresh install or compatible upgrade:
-
-```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.2.1.run install \
-  --enable-reference-hibernate
-sudo aag-safe-suspend health-check
-```
-
-Every reported Hibernate gate must pass before using the project command:
-
-```bash
-sudo aag-safe-suspend hibernate
-```
-
-The command validates the current swapfile, resume device and offset, initramfs
-resume support, image capacity, memory pressure, kernel support, external
-storage fence, and optional T700 integration before entering the native systemd
-plain-Hibernate path. It does not enable Hibernate automatically, schedule it,
-or use it as a hot-bag fallback.
-
-On the accepted T700 reference configuration, recovery waits for the later
-post-S4 device generation to become stable for ten consecutive seconds,
-performs one bounded ModemManager recovery, and requires both ModemManager
-enumeration and NetworkManager WWAN connectivity. GNSS remains on demand.
-
-Suspend-then-hibernate and hybrid sleep are not enabled and have not been
-accepted. See [Hibernate](docs/HIBERNATE.md), [T700 WWAN recovery](docs/T700-WWAN-HIBERNATE.md),
-and [tested hardware](docs/TESTED-HARDWARE.md).
-
-## Scope and limitations
-
-Tested behavior and design support are deliberately different:
-
-- **Tested on:** the reference platform above, with ext4 filesystems on the
-  target and an RTL9210 bridge.
-- **Supported by design:** Ubuntu-family systemd desktops, one USB-attached
-  whole-disk target whose every partition has a unique filesystem UUID,
-  changing `/dev/sdX` generations, and unrelated removable media appearing at
-  the same time.
-- **Untested:** other distributions, non-systemd suspend, other desktops,
-  Thunderbolt/PCIe hotplug, encrypted or stacked target filesystems, multiple
-  protected external disks, and non-ext4 physical acceptance.
-- **Known limitations:** a disk with unformatted or UUID-less partitions is
-  rejected; unexpected systemd jobs fail the installer closed; firmware/kernel
-  hangs remain outside software guarantees; Timeshift integration covers the
-  diverted CLI/GTK entry points, not arbitrary direct execution of private
-  binaries. Active virtual USB devices block ordinary suspend until their owner
-  shuts them down safely; the project never performs an automatic hot-unplug.
-- **Plain Hibernate:** supported and physically accepted on the reference
-  platform only; opt-in readiness gates fail closed elsewhere.
-- **Suspend-then-hibernate / hybrid sleep:** not enabled and not accepted.
-- **Modem/GNSS:** the reference T700 recovery is mode-specific; no modem
-  identifiers, AT commands, GNSS activation, or raw evidence are included.
-
-Further reading: [architecture](docs/ARCHITECTURE.md),
-[USBClone ordinary-suspend gate](docs/USBCLONE-ORDINARY-SUSPEND.md),
-[GNOME/udisks race](docs/GNOME-UDISKS-AUTOMOUNT.md),
-[RTL9210 behavior](docs/RTL9210.md), [Timeshift](docs/TIMESHIFT.md), and
-[troubleshooting](docs/TROUBLESHOOTING.md).
+Plain Hibernate remains opt-in and separately qualified; see
+[Hibernate](docs/HIBERNATE.md). Suspend-then-hibernate and hybrid sleep are not
+enabled or accepted. [Release notes](docs/RELEASE-NOTES-v1.3.0.md) describe the
+precise release scope and limitations.
 
 ## Development
 
-The test corpus is synthetic and privacy-safe:
-
 ```bash
 make check
-make release-check
+make release-acceptance
 ```
 
-The project is licensed under the [MIT License](LICENSE). Storage-safety flaws
-should be reported privately according to [SECURITY.md](SECURITY.md).
+Release validation pins the twelve accepted runtime/entrypoint/unit files by
+SHA256. Those files are deliberately not reformatted during publication;
+packaging and test code use the normal lint/format gates. The qualified adapter package version changes as metadata. The portable
+maintenance writer additionally fixes stale bytecode during rapid rollback;
+that change does not alter the qualified sleep transaction. Tests use synthetic
+fixtures and isolated installation roots. Private `/reports/` is excluded from
+Git, release payloads and public scans; it is never uploaded as an asset.
 
-[v1.2.0 release]: https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/releases/tag/v1.2.0
-[v1.2.1 release]: https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/releases/tag/v1.2.1
+Licensed under [MIT](LICENSE). Report storage-safety issues using
+[SECURITY.md](SECURITY.md).
