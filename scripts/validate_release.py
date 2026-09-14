@@ -55,8 +55,8 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         or manifest["migration_schema"] != 3
         or manifest["systemd_wiring_revision"] != 3
     ):
-        raise RuntimeError("v1.3.0 schema or wiring metadata is inconsistent")
-    if ">=1.0.0,<1.3.0" not in manifest["supported_upgrade_from"]:
+        raise RuntimeError("v1.3.1 schema or wiring metadata is inconsistent")
+    if ">=1.0.0,<1.3.1" not in manifest["supported_upgrade_from"]:
         raise RuntimeError("public v1.0.0 bootstrap compatibility is not declared")
     required_migrations = {
         "bootstrap-public-v1.0.0-to-installed-state-v1",
@@ -90,7 +90,7 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         raise RuntimeError("transaction adapter packaging scope mismatch")
     if (
         transaction.get("accepted_implementation_commit")
-        != "18c23506f89943af65e62c6cce24d45462515994"
+        != "8c0095236f1095e29f5674db0a32476f431c964b"
     ):
         raise RuntimeError("accepted implementation identity mismatch")
     assets = manifest["assets"]

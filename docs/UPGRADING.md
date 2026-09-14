@@ -1,5 +1,14 @@
 # In-place upgrades
 
+## v1.3.0 to v1.3.1
+
+v1.3.1 corrects collected transient-unit checkpoint verification in the reference
+adapter. It changes no configuration schema, storage policy, T700/LockLock
+interface, ordinary-suspend ordering, retry or fail-safe rule. Existing reference
+hosts use the `transaction` command with their reviewed private configuration
+and a new backup/report directory. Preserve the v1.3.0 release and exact installed
+snapshot as rollback. The normal portable upgrade preserves its existing profile.
+
 ## v1.2.1 to v1.3.0 and profile selection
 
 The portable upgrade preserves schema 2, wiring revision 3, configuration and
@@ -9,7 +18,7 @@ services. The new `transaction` installer route is explicit and requires the
 reviewed existing V2/T700/LockLock dependencies and private host policy. It
 applies the accepted deployment mapping and saves exact-file rollback.
 
-For a reference deployment, run the verified v1.3.0 asset with `transaction`,
+For a reference deployment, run the verified current asset with `transaction`,
 `--config`, and a private `--report`, beginning with `--check`. An already
 accepted installation needs no reinstall solely for publication. Do not run
 the portable installer over the reference graph to enable the new behavior.
@@ -28,8 +37,8 @@ run it directly. An existing supported installation is detected automatically;
 
 ```bash
 sha256sum --ignore-missing -c SHA256SUMS
-chmod +x aag-external-storage-safe-suspend-linux-v1.3.0.run
-sudo ./aag-external-storage-safe-suspend-linux-v1.3.0.run
+chmod +x aag-external-storage-safe-suspend-linux-v1.3.1.run
+sudo ./aag-external-storage-safe-suspend-linux-v1.3.1.run
 ```
 
 The installer reports `FRESH_INSTALL`, `SAME_VERSION`, `UPGRADE`, or a precise
@@ -76,7 +85,7 @@ Hibernate defaults to disabled during an ordinary migration. On the documented
 reference platform, opt in during the same transaction with:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.3.0.run install \
+sudo ./aag-external-storage-safe-suspend-linux-v1.3.1.run install \
   --enable-reference-hibernate
 sudo aag-safe-suspend health-check
 ```

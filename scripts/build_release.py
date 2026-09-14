@@ -14,7 +14,7 @@ import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 PROJECT = "aag-external-storage-safe-suspend-linux"
 EPOCH = 1789344000  # 2026-09-14T00:00:00Z
 EXCLUDES = {
@@ -158,7 +158,7 @@ def build() -> dict[str, object]:
         "migration_schema": 3,
         "systemd_wiring_revision": 3,
         "udev_rule_revision": 1,
-        "supported_upgrade_from": [">=1.0.0,<1.3.0"],
+        "supported_upgrade_from": [">=1.0.0,<1.3.1"],
         "supported_downgrade_from": [],
         "migration_ids": [
             "bootstrap-public-v1.0.0-to-installed-state-v1",
@@ -172,7 +172,7 @@ def build() -> dict[str, object]:
             "installer_command": "transaction",
             "scope": "QUALIFIED_EXISTING_V2_T700_LOCKLOCK_STACK",
             "automatic_portable_conversion": False,
-            "accepted_implementation_commit": "18c23506f89943af65e62c6cce24d45462515994",
+            "accepted_implementation_commit": "8c0095236f1095e29f5674db0a32476f431c964b",
             "runtime_sha256_manifest": "docs/transaction-runtime-sha256.json",
             "actual_physical_lid_acceptance": "PASS",
         },

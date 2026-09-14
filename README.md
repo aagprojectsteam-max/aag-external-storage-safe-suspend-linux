@@ -3,6 +3,12 @@
 [![CI](https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/actions/workflows/ci.yml/badge.svg)](https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+**v1.3.1 fixes checkpoint verification for collected user services.** A transient
+service that saved its checkpoint and exited can disappear from systemd before
+verification. The adapter now confirms that the reachable user manager reports
+the unit absent and inactive before accepting the stop. Missing bus access or
+incomplete observations still use the existing safe fallback.
+
 **v1.3.0 adds the physically validated AAG sleep transaction adapter.** On the
 qualified reference installation, normal lid closure now completes one owned
 suspend transaction, safely resolves eligible blockers, verifies actual kernel
@@ -59,7 +65,7 @@ helpers and machine configuration are not bundled. See
 ## Validated scope
 
 The accepted reference implementation passed **201 automated tests** before
-physical acceptance. The release candidate passes **209 tests**, including packaging and maintenance
+physical acceptance. The v1.3.1 candidate passes **215 tests**, including packaging and maintenance
 regressions. One final physical lid-close/open test under an existing
 workload recorded **112.615150 seconds** of hardware/PMC low-power sleep, one
 suspend transaction, successful resume, DATA/UGREEN restoration and **21 passing
@@ -79,19 +85,19 @@ Hibernate behavior were not requalified by this release's lid test.
 ## Verify and install
 
 Download the `.run`, `SHA256SUMS`, and `release-manifest.json` from the
-[v1.3.0 release](https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/releases/tag/v1.3.0):
+[v1.3.1 release](https://github.com/aagprojectsteam-max/aag-external-storage-safe-suspend-linux/releases/tag/v1.3.1):
 
 ```bash
 sha256sum --ignore-missing -c SHA256SUMS
-chmod +x aag-external-storage-safe-suspend-linux-v1.3.0.run
+chmod +x aag-external-storage-safe-suspend-linux-v1.3.1.run
 ```
 
 For an already reviewed reference stack, use its private configuration and a
 private deployment-report directory:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.3.0.run transaction   --config /etc/aag-sleep-transaction/config.json   --report /var/lib/aag-sleep-transaction/deployment --check
-sudo ./aag-external-storage-safe-suspend-linux-v1.3.0.run transaction   --config /etc/aag-sleep-transaction/config.json   --report /var/lib/aag-sleep-transaction/deployment
+sudo ./aag-external-storage-safe-suspend-linux-v1.3.1.run transaction   --config /etc/aag-sleep-transaction/config.json   --report /var/lib/aag-sleep-transaction/deployment --check
+sudo ./aag-external-storage-safe-suspend-linux-v1.3.1.run transaction   --config /etc/aag-sleep-transaction/config.json   --report /var/lib/aag-sleep-transaction/deployment
 ```
 
 An already accepted production deployment does not need reinstalling solely
@@ -102,7 +108,7 @@ used for the reference adapter.
 For a fresh **portable** installation, the existing interface remains:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.3.0.run install   --device /dev/disk/by-id/your-external-backup-disk   --protect-mount /mnt/data --timeshift
+sudo ./aag-external-storage-safe-suspend-linux-v1.3.1.run install   --device /dev/disk/by-id/your-external-backup-disk   --protect-mount /mnt/data --timeshift
 ```
 
 Omit `--timeshift` when unused. Protect `/` and every important internal mount.
@@ -129,7 +135,7 @@ Do not run another physical test merely to publish an already accepted runtime.
 
 Plain Hibernate remains opt-in and separately qualified; see
 [Hibernate](docs/HIBERNATE.md). Suspend-then-hibernate and hybrid sleep are not
-enabled or accepted. [Release notes](docs/RELEASE-NOTES-v1.3.0.md) describe the
+enabled or accepted. [Release notes](docs/RELEASE-NOTES-v1.3.1.md) describe the
 precise release scope and limitations.
 
 ## Development

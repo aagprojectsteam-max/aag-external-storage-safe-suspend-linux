@@ -89,9 +89,9 @@ class CollectedWorkloadTests(unittest.TestCase):
                         self.result(1, "", "Failed to connect to bus"),
                     ],
                 ),
+                self.assertRaises(transaction.Refusal),
             ):
-                with self.assertRaises(transaction.Refusal):
-                    self.observe()
+                self.observe()
 
     def test_recreated_or_incompletely_observed_unit_does_not_confirm_absence(self):
         cases = [
@@ -109,31 +109,33 @@ class CollectedWorkloadTests(unittest.TestCase):
                     "run",
                     side_effect=[self.result(4, "inactive\n"), self.result(0, state)],
                 ),
+                self.assertRaises(transaction.Refusal),
             ):
-                with self.assertRaises(transaction.Refusal):
-                    self.observe()
+                self.observe()
 
     def test_absence_cannot_replace_a_missing_durable_checkpoint(self):
         receipts = []
-        with patch.object(
-            production,
-            "run",
-            side_effect=[
-                self.result(0, "active\n"),
-                self.result(0, "{}"),
-                self.result(4, "inactive\n"),
-                self.result(0, self.absent),
-            ],
+        with (
+            patch.object(
+                production,
+                "run",
+                side_effect=[
+                    self.result(0, "active\n"),
+                    self.result(0, "{}"),
+                    self.result(4, "inactive\n"),
+                    self.result(0, self.absent),
+                ],
+            ),
+            self.assertRaises(transaction.Refusal),
         ):
-            with self.assertRaises(transaction.Refusal):
-                workloads.quiesce(
-                    [self.row],
-                    {"compute"},
-                    self.host.workload_run,
-                    lambda: None,
-                    receipts,
-                    lambda *a, **kw: None,
-                )
+            workloads.quiesce(
+                [self.row],
+                {"compute"},
+                self.host.workload_run,
+                lambda: None,
+                receipts,
+                lambda *a, **kw: None,
+            )
         self.assertEqual(receipts[0]["status"], "STOP_FAILED")
 
     def test_existing_active_and_inactive_units_keep_original_semantics(self):

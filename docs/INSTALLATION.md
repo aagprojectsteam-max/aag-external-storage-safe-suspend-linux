@@ -1,4 +1,4 @@
-# Installation profiles in v1.3.0
+# Installation profiles in v1.3.1
 
 The verified `.run` asset contains the portable coordinator and the qualified
 reference transaction adapter. Choose one graph owner; the installer does not
@@ -44,7 +44,7 @@ publish or download this release.
 
 The established `install --device <whole-disk-by-id> --protect-mount /mnt/data`
 interface remains. Add `--timeshift` only if needed. Existing v1.0.0 through
-v1.2.1 installations use the asset without arguments to upgrade in place.
+v1.3.0 installations use the asset without arguments to upgrade in place.
 Supported configuration and the existing portable ordinary/Hibernate contracts
 are preserved. Automatic generic blocker termination is a feature of the
 explicit reference transaction profile, not the portable read-only gadget gate.

@@ -1,9 +1,9 @@
 {
-  "accepted_implementation_commit": "18c23506f89943af65e62c6cce24d45462515994",
+  "accepted_implementation_commit": "8c0095236f1095e29f5674db0a32476f431c964b",
   "sha256": {
     "src/aag-sleep-transaction": "e11edbd087b9017f09ccc36e10362b8ba72917c5208e07300d1da744b0e4789c",
     "src/aag_safe_suspend/locklock_compat.py": "1702d7a7c6b0af6481d290f4c49cef5b4535bfb63a8ea774721a49033b335ad0",
-    "src/aag_safe_suspend/production.py": "2ca9edc1590abe6a2dae4dbc5e2070de5a920a23a49636217f8c096ee525da41",
+    "src/aag_safe_suspend/production.py": "945f3fd1d1c1e6a3d37421eab44ca4a6b5d985962480a59d268fc7d6411e8f1c",
     "src/aag_safe_suspend/transaction.py": "9de9867ce79b38090bbaec0d8e0cbac2922aa8a1ce8f5c7b6732ee33438337f4",
     "src/aag_safe_suspend/workloads.py": "620cfbfbfb384e1cfd5e701877638e50af8bd22311380692ddf9001e53edfeb4",
     "systemd/production/aag-sleep-transaction-boot.service": "4ad754ec24c48d21b69cc5207a494d72c85259cfaf0392fe7db6d283109ed14b",
@@ -13,5 +13,7 @@
     "systemd/production/retry.conf": "846a986e1feeba6cc85b7a256028d7c1ccef24682b8498a0f3e75387fa08ad34",
     "systemd/production/storage.conf": "ebb97e5c1856ba3dac59d13ae43a58318e767bde6e20ed1e2bfde14b077a024a",
     "systemd/production/touchpad.conf": "f1defe34b68b98154ed4e4e5b3a10e8f490067a9daf762c36e07f580925efafc"
-  }
+  },
+  "baseline_accepted_implementation_commit": "18c23506f89943af65e62c6cce24d45462515994",
+  "qualification_note": "v1.3.1 preserves the v1.3.0 transaction architecture and adds confirmed absence handling for collected systemd user units."
 }

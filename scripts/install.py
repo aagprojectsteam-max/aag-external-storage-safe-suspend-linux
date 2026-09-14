@@ -1152,7 +1152,7 @@ class Installer:
                 "payload_cache": payload_cache,
                 "rollback": rollback,
                 "compatibility": {
-                    "upgrade_from": ">=1.0.0,<1.3.0",
+                    "upgrade_from": ">=1.0.0,<1.3.1",
                     "downgrade": "explicit-compatible-snapshot-only",
                     "runtime_architecture": (
                         "ordinary-usbclone-gate-v1+suspend-contract-v1+plain-hibernate-reference-v1"
