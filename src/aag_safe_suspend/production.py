@@ -293,6 +293,18 @@ class Host:
                       f"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{uid}/bus"]
         p = run(prefix + command, timeout=timeout, check=False, cwd="/")
         if row.get("protocol") == "systemd-user" and command[-1] == row.get("unit"):
+            if p.returncode == 4:
+                # Collected transient units disappear after a successful stop.
+                # Confirm absence through the reachable manager; an exit code
+                # alone must never turn an unavailable bus into "stopped".
+                observed = run(prefix + ["/usr/bin/systemctl", "--user", "show", row["unit"],
+                    "--property=LoadState,ActiveState,SubState,MainPID"],
+                    timeout=timeout, check=False, cwd="/")
+                state = dict(line.split("=", 1) for line in observed.stdout.splitlines() if "=" in line)
+                if observed.returncode == 0 and state == {
+                        "LoadState": "not-found", "ActiveState": "inactive",
+                        "SubState": "dead", "MainPID": "0"}:
+                    return {"active": False}
             if p.returncode not in (0, 3):
                 raise rules.Refusal("workload user manager is unobservable")
             return {"active": p.stdout.strip() in {"active", "activating", "deactivating", "reloading"}}
