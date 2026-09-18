@@ -13,13 +13,19 @@ ACTIVE = {"PREPARING_SLEEP", "SLEEP_COMMITTED", "SUSPEND_REQUESTED", "VERIFYING_
 TERMINAL = {"COMPLETE", "RECOVERED", "ABANDONED", "IDLE"}
 MAX_RETRIES = 1
 LEASE_SECONDS = 300
-QUALIFICATION_CHECKS = {'sustained_hardware_sleep', 'residency_matches_cycle', 'lid_open_after_cycle'}
+# Qualification describes sleep quality/acceptance, not whether devices recovered.
+# A residency counter disagreement must remain visible evidence, but must not by
+# itself turn an otherwise healthy resume into a device-recovery failure.
+QUALIFICATION_CHECKS = {
+    'sustained_hardware_sleep', 'residency_matches_cycle', 'lid_open_after_cycle',
+    'pmc_agrees_with_hardware_counter',
+}
 HEALTH_CHECKS = {'same_boot', 'exactly_one_completed_cycle', 'no_suspend_counter_failure',
     'one_kernel_entry_and_exit', 'candidate_held_through_capture', 'no_relevant_kernel_error',
     'data_unchanged', 'v2_files_unchanged', 'same_loaded_baseline',
     'cellular_reconnected_automatically', 'same_cellular_profile', 'saved_policy_restored',
     'native_service_success', 'same_systemd_invocation', 'journal_sequence_valid',
-    'pmc_agrees_with_hardware_counter', 'data_still_healthy_after_reconnect', 'loaded_module_still_baseline'}
+    'data_still_healthy_after_reconnect', 'loaded_module_still_baseline'}
 
 
 def device_health(result):
