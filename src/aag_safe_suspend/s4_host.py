@@ -480,6 +480,10 @@ class Host(p.Host):
                 self.update(s4_failure_outcome=outcome)
             self.phase("RESTORING", target_outcome=outcome)
             self.restore_storage(cold)
+            # USB Clone is prepared by the shared Host path and carries its own
+            # durable was_running/if_was_running receipt. Restore it only after
+            # DATA/storage identity is healthy, for both image resume and abort.
+            self.restore_clones()
             self.restore_network(outcome == "COMPLETE", cold)
             self.restore_consumers()
             if not cold and self.t.policy() != self.value["s4_before"]["modem_policy"]:

@@ -356,6 +356,7 @@ class HostLifecycleTests(unittest.TestCase):
             return_value={"consumed": True, "before_dispatch": copy.deepcopy(self.before)}
         )
         self.host.quiesce_clones = Mock()
+        self.host.restore_clones = Mock()
         self.host.resolve_process_blockers = Mock()
         self.host.audit_storage = Mock(
             return_value={"AUDIT_COMPLETE": True, "EXTERNAL_OWNER": "NONE"}
@@ -391,6 +392,7 @@ class HostLifecycleTests(unittest.TestCase):
         self.assertEqual(self.state["state"], "IDLE")
         self.assertEqual(json.loads((self.root / "current.json").read_text())["state"], "IDLE")
         self.host.quiesce_clones.assert_called()
+        self.host.restore_clones.assert_called_once_with()
         self.host.resolve_process_blockers.assert_called_once()
 
     def test_NM_prepare_for_sleep_does_not_erase_original_network_obligation(self):
@@ -404,6 +406,16 @@ class HostLifecycleTests(unittest.TestCase):
         self.host.value = tx.new("boot", "old-suspend-invocation")
         self.host.save()
         self.assertNotIn("transaction_type", self.state)
+
+    def test_usbclone_restore_runs_after_storage_before_other_restores(self):
+        self.resumed()
+        order = []
+        self.host.restore_storage = Mock(side_effect=lambda cold=False: order.append("storage"))
+        self.host.restore_clones = Mock(side_effect=lambda: order.append("usbclone"))
+        self.host.restore_network = Mock(side_effect=lambda image, cold: order.append("network"))
+        self.host.restore_consumers = Mock(side_effect=lambda: order.append("consumers"))
+        self.host.finish()
+        self.assertEqual(order, ["storage", "usbclone", "network", "consumers"])
 
     def test_required_consumer_restored_through_common_durable_receipt(self):
         self.resumed()
