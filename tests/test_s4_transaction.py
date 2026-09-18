@@ -455,6 +455,7 @@ class HostLifecycleTests(unittest.TestCase):
         self.assertEqual(self.archive()["final_outcome"], "IMAGE_WRITE_FAILED")
         self.assertFalse(self.archive()["image_resume_confirmed"])
         self.assertEqual(self.state["state"], "IDLE")
+        self.host.restore_clones.assert_called_once_with()
 
     def test_final_memory_gate_failure_aborts_preparation_without_poweroff(self):
         self.host.begin()
@@ -502,6 +503,7 @@ class HostLifecycleTests(unittest.TestCase):
         self.host.boot()
         self.network.assert_not_called()
         self.host.finish()  # the queued finish service, after the boot unit exits
+        self.host.restore_clones.assert_called_once_with()
         final = self.archive()
         self.assertEqual(final["origin_boot_id"], old["origin_boot_id"])
         self.assertEqual(final["final_outcome"], "COLD_BOOT_FALLBACK")
@@ -563,6 +565,18 @@ class HostLifecycleTests(unittest.TestCase):
         os.environ["INVOCATION_ID"] = "stale"
         self.host.native_post()
         self.assertEqual(self.state, before)
+
+    def test_usbclone_restore_failure_is_durable_and_retriable(self):
+        self.resumed()
+        self.host.restore_clones.side_effect = tx.Refusal("USB Clone restart unconfirmed")
+        with self.assertRaises(tx.Refusal):
+            self.host.finish()
+        self.assertEqual(self.state["s4_phase"], "RESTORE_FAILED")
+        self.assertEqual(self.state["state"], "FAILURE_PENDING")
+        self.host.restore_clones.side_effect = None
+        self.host.finish()
+        self.assertEqual(self.archive()["final_outcome"], "COMPLETE")
+        self.assertEqual(self.state["state"], "IDLE")
 
     def test_DATA_restore_failure_can_be_reconciled_without_another_cycle(self):
         self.resumed()
