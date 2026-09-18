@@ -11,8 +11,15 @@ import time
 
 from .transaction import Refusal
 
-# These are safety exclusions, not an allowlist of applications permitted to
-# sleep. Unknown ordinary user programs take the same TERM/KILL fallback.
+
+class OneWayStopProhibited(Refusal):
+    """Automatic Suspend may not stop something it cannot safely restore."""
+
+
+# These are safety exclusions, not an application allowlist. The low-level
+# helper can still perform a reviewed TERM/KILL fallback when allow_stop=True;
+# production Ordinary Suspend passes allow_stop=False unless a reversible
+# registered workload/virtual-device path owns the stop.
 CRITICAL = re.compile(r"(?:^|[/\s_-])(?:postgres(?:ql)?|mysqld|mariadbd|mongod|redis-server|"
     r"qdrant|etcd|cockroach|qemu(?:-system)?|virtualbox|vmware|firecracker|"
     r"apt(?:-get)?|dpkg|rpm|dnf|pacman|unattended-upgrade|packagekitd|"
@@ -80,7 +87,8 @@ def classify_process(info, protected, *, container_safe=False):
 
 def terminate_blocker(record, *, snapshot=process_snapshot, protected=None,
                       still_holds, safe_stop, container_safe, save, receipts, emit,
-                      clock=time.monotonic, sleep=time.sleep, term_seconds=15):
+                      clock=time.monotonic, sleep=time.sleep, term_seconds=15,
+                      allow_stop=True):
     """Only an audited PID/start pair may be signalled, via a pinned pidfd.
 
     Recheck resource ownership and classification before each signal. A stale
@@ -104,6 +112,12 @@ def terminate_blocker(record, *, snapshot=process_snapshot, protected=None,
         if not still_holds(pid, str(start)):
             return
         policy = classify_process(info, protected, container_safe=container_safe(info))
+        if not allow_stop:
+            emit('BLOCKER_FOUND', pid=pid, start=str(start), exe=info['exe'], policy=policy,
+                 resource=record, action='left-running-no-safe-restore')
+            raise OneWayStopProhibited(
+                f'PID {pid}: automatic stop prohibited without a verified restore recipe'
+            )
         receipt = {'pid': pid, 'start': str(start), 'exe': info['exe'], 'policy': policy,
                    'resource': record, 'status': 'STOP_REQUESTED', 'restart_after_resume': 'never'}
         receipts.append(receipt); save()
@@ -172,7 +186,7 @@ def validate_registry(rows: list) -> None:
 
 
 def quiesce(rows: list, affected: set[str], run: Callable, save: Callable,
-            stopped: list, emit: Callable) -> None:
+            stopped: list, emit: Callable, *, require_restore: bool = False) -> None:
     validate_registry(rows)
     for row in rows:
         if row["importance"] == "critical" or row.get("storage_dependency") not in affected:
@@ -182,6 +196,12 @@ def quiesce(rows: list, affected: set[str], run: Callable, save: Callable,
             continue
         if status.get("active") is not True:
             raise Refusal(f"{row['name']}: detection incomplete")
+        if require_restore and row.get("restart_after_resume") != "if_was_running":
+            emit("BLOCKER_FOUND", workload=row["name"], policy=row["importance"],
+                 action="left-running-no-safe-restore")
+            raise OneWayStopProhibited(
+                f"{row['name']}: automatic stop prohibited without a verified restore recipe"
+            )
         emit("BLOCKER_FOUND", workload=row["name"], policy=row["importance"])
         receipt = {"name": row["name"], "was_running": True, "status": "STOP_REQUESTED",
                    "restart_after_resume": row["restart_after_resume"]}

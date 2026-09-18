@@ -141,6 +141,16 @@ class WorkloadTests(unittest.TestCase):
         self.assertEqual(receipts[0]["status"], "LEFT_STOPPED_BY_POLICY")
         self.assertEqual(run.call_count, 3)
 
+    def test_ordinary_suspend_restore_requirement_leaves_one_way_workload_running(self):
+        run = Mock(return_value={"active": True})
+        receipts = []
+        with self.assertRaises(workloads.OneWayStopProhibited):
+            workloads.quiesce(
+                [self.row], {"DATA"}, run, Mock(), receipts, Mock(), require_restore=True
+            )
+        self.assertEqual(receipts, [])
+        run.assert_called_once_with(self.row, self.row["detect"], 15)
+
     def test_graceful_stop_failure_never_escalates_to_kill(self):
         run = Mock(
             side_effect=[{"active": True}, {"durable_state_preserved": False}, {"active": True}]
@@ -307,6 +317,26 @@ class HostTests(unittest.TestCase):
         self.host.begin()
         self.assertEqual(self.state["prep_invocation"], "prep")
         self.assertEqual(self.state["retry_count"], 0)
+
+    def test_production_begin_does_not_swallow_one_way_restore_refusal(self):
+        row = {
+            "name": "one-way fixture",
+            "importance": "nonessential_checkpointable",
+            "detect": ["/usr/bin/check"],
+            "safe_stop_command": ["/usr/bin/checkpoint"],
+            "verify_stopped": ["/usr/bin/check"],
+            "stop_timeout": 20,
+            "restart_after_resume": "never",
+            "storage_dependency": "compute",
+        }
+        self.state = {"state": "IDLE", "boot_id": "boot"}
+        self.host.cfg = {"workloads": [row]}
+        self.host.workload_run = Mock(return_value={"active": True})
+        with self.assertRaises(workloads.OneWayStopProhibited):
+            self.host.begin()
+        self.host.quiesce_clones.assert_not_called()
+        self.assertEqual(self.state["state"], "FAILURE_PENDING")
+        self.assertIn("verified restore recipe", self.state["reason"])
 
     def test_overlap_does_not_replace_state_or_run_workloads(self):
         self.host.live_owner.return_value = True

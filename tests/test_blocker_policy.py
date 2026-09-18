@@ -111,6 +111,24 @@ class TerminationTests(unittest.TestCase):
             term_seconds=0.5,
         )
 
+    def test_production_policy_can_refuse_one_way_process_stop_before_any_signal(self):
+        with self.assertRaises(w.OneWayStopProhibited):
+            w.terminate_blocker(
+                self.record,
+                snapshot=self.snapshot,
+                protected={1},
+                still_holds=lambda pid, start: self.holds,
+                safe_stop=self.safe,
+                container_safe=lambda info: False,
+                save=self.save,
+                receipts=self.receipts,
+                emit=lambda *a, **k: self.events.append((a, k)),
+                allow_stop=False,
+            )
+        self.send.assert_not_called()
+        self.safe.assert_not_called()
+        self.assertEqual(self.receipts, [])
+
     def test_graceful_release_skips_forced_termination_and_records_before_signal(self):
         def release(*args):
             self.assertTrue(self.save.called)
