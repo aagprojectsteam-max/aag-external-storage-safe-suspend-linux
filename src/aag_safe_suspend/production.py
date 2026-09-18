@@ -351,10 +351,7 @@ class Host:
             try:
                 workloads.quiesce(self.cfg["workloads"], {"DATA", "UGREEN", "compute"},
                                   self.workload_run, lambda: self.save(),
-                                  self.value["stopped_workloads"], self.emit,
-                                  require_restore=True)
-            except workloads.OneWayStopProhibited:
-                raise
+                                  self.value["stopped_workloads"], self.emit)
             except rules.Refusal as e:
                 # A missing optional checkpoint API is not a sleep veto.
                 # Exact storage references below still require verified release.
@@ -682,8 +679,7 @@ class Host:
                 try:
                     workloads.terminate_blocker(record, still_holds=still_holds,
                         safe_stop=self.critical_safe_stop, container_safe=self.container_noncritical,
-                        save=self.save, receipts=self.value['stopped_processes'], emit=self.emit,
-                        allow_stop=False)
+                        save=self.save, receipts=self.value['stopped_processes'], emit=self.emit)
                 except Exception as e:
                     self.failed('QUIESCE_NONESSENTIAL_WORKLOADS', str(e), self.enrich(blockers))
                     raise
