@@ -13,6 +13,7 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import pwd
 import re
 import stat
 import subprocess
@@ -685,6 +686,25 @@ class Host:
                     raise
                 resolved.add(key)
 
+    def clone_repository(self, configured):
+        configured_repo = configured.get("repository")
+        if configured_repo:
+            repository = Path(configured_repo)
+        else:
+            user = self.cfg.get("notification_user")
+            if not user:
+                raise rules.Refusal("USB Clone repository owner is not configured")
+            try:
+                repository = Path(pwd.getpwnam(user).pw_dir) / "USB-CLONES"
+            except KeyError:
+                raise rules.Refusal("USB Clone repository owner does not exist") from None
+        if repository.is_symlink() or not repository.is_dir():
+            raise rules.Refusal("USB Clone repository is unavailable")
+        expected_uid = self.cfg.get("notification_uid")
+        if expected_uid is not None and repository.stat().st_uid != int(expected_uid):
+            raise rules.Refusal("USB Clone repository ownership changed")
+        return repository
+
     def clone_inventory(self):
         root = Path("/sys/kernel/config/usb_gadget")
         if not root.exists():
@@ -832,6 +852,7 @@ class Host:
         if hashlib.sha256(command.read_bytes()).hexdigest() != configured["sha256"]:
             raise rules.Refusal("USB Clone command changed before restore")
         profiles = configured.get("profiles", {})
+        repository = self.clone_repository(configured)
 
         def matches(row, receipt):
             profile = receipt["name"].removeprefix("usbclone_")
@@ -856,10 +877,23 @@ class Host:
                 receipt["status"] = "RESTORED"
                 self.save()
                 continue
+            profile_dir = repository / "profiles" / profile
+            if not profile_dir.exists():
+                raise rules.Refusal("USB Clone profile is missing from configured repository")
+            backing = profile_dir / "disk.img"
+            if not backing.exists() or backing.resolve() != Path(profiles[profile]).resolve():
+                raise rules.Refusal("USB Clone repository profile does not match configured backing")
             receipt["status"] = "RESTORE_REQUESTED"
             self.save()
             self.emit("BLOCKER_RESTORE_REQUESTED", workload=name, profile=profile)
-            run([configured["command"], "start", profile], timeout=30)
+            run([
+                "/usr/bin/env",
+                f"USB_CLONE_HOME={repository}",
+                configured["command"],
+                "start",
+                profile,
+                receipt["udc"],
+            ], timeout=30)
             run(["/usr/bin/udevadm", "settle", "--timeout=5"], timeout=7)
             deadline = time.monotonic() + 7
             while True:

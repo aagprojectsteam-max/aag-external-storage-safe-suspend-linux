@@ -500,16 +500,22 @@ class ClonePolicyTests(unittest.TestCase):
 
         command = self.root / "usbclone"
         command.write_text("test fixture; never executed")
+        repository = self.root / "USB-CLONES"
+        profile = repository / "profiles" / "test"
+        profile.mkdir(parents=True)
+        backing = profile / "disk.img"
+        backing.write_bytes(b"fixture")
         self.clone = {
             "name": "usbclone_test",
             "udc": "dummy_udc.0",
             "functions": ["mass_storage.0"],
-            "backings": ["/sample/disk.img"],
+            "backings": [str(backing)],
         }
         self.host.cfg["usbclone"] = {
             "command": str(command),
             "sha256": hashlib.sha256(command.read_bytes()).hexdigest(),
-            "profiles": {"test": "/sample/disk.img"},
+            "repository": str(repository),
+            "profiles": {"test": str(backing)},
         }
         self.host.clone_inventory = Mock(side_effect=[[self.clone], [self.clone], []])
         self.host.clone_audit = Mock(return_value={"AUDIT_COMPLETE": True, "records": []})
@@ -540,8 +546,42 @@ class ClonePolicyTests(unittest.TestCase):
         self.host.clone_inventory = Mock(side_effect=[[], [self.clone]])
         with patch.object(production, "trusted"), patch.object(production, "run") as run:
             production.Host.restore_clones(self.host)
-        self.assertEqual(run.call_args_list[0].args[0], [str(command), "start", "test"])
+        self.assertEqual(
+            run.call_args_list[0].args[0],
+            [
+                "/usr/bin/env",
+                f"USB_CLONE_HOME={self.host.cfg['usbclone']['repository']}",
+                str(command),
+                "start",
+                "test",
+                "dummy_udc.0",
+            ],
+        )
         self.assertEqual(self.state["usbclone_stopped"][0]["status"], "RESTORED")
+
+    def test_clone_repository_falls_back_to_notification_users_home_not_root_home(self):
+        command = self.setup_clone()
+        repository = Path(self.host.cfg["usbclone"].pop("repository"))
+        self.host.cfg["notification_user"] = "reference-user"
+        self.host.cfg["notification_uid"] = repository.stat().st_uid
+        receipt = {
+            **self.clone,
+            "status": "STOPPED",
+            "was_running": True,
+            "restart_after_resume": "if_was_running",
+        }
+        self.host.value["usbclone_stopped"] = [receipt]
+        self.host.save()
+        self.host.clone_inventory = Mock(side_effect=[[], [self.clone]])
+        with (
+            patch.object(production, "trusted"),
+            patch.object(production.pwd, "getpwnam", return_value=SimpleNamespace(pw_dir=str(repository.parent))),
+            patch.object(production, "run") as run,
+            patch.dict(os.environ, {"USER": "root", "HOME": "/root"}, clear=False),
+        ):
+            production.Host.restore_clones(self.host)
+        self.assertEqual(run.call_args_list[0].args[0][1], f"USB_CLONE_HOME={repository}")
+        self.assertEqual(run.call_args_list[0].args[0][-1], "dummy_udc.0")
 
     def test_clone_restore_refuses_changed_profile_without_starting_anything(self):
         self.setup_clone()
