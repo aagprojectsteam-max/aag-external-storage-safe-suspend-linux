@@ -1,16 +1,26 @@
 # In-place upgrades
 
 Documentation updates on `main` after publication do not change the immutable
-v1.4.0 release assets or tag. Download the verified release for installation;
+v1.4.1 release assets or tag. Download the verified release for installation;
 an already accepted production system needs no upgrade for a documentation edit.
 
-## v1.3.1 to v1.4.0
+## v1.4.0 to v1.4.1
+
+v1.4.1 is a patch upgrade. The portable installer preserves supported
+configuration and exact rollback state. For the qualified reference transaction
+or Hibernate extension, deploy only with inspected private configuration and the
+v1.4.1 runtime manifests; do not substitute public example configuration for a
+machine-specific accepted stack.
+
+The release acceptance suite validates direct upgrade and exact rollback using
+the preserved verified v1.4.0 asset.
+
+## v1.3.1 to v1.4.1
 
 Portable upgrades preserve the existing schema and graph; the release adds an
 explicit `hibernate` route for the already qualified reference stack. This route
 requires the reviewed private S4 configuration, tested gates and protected baseline
-hashes described in [installation](INSTALLATION.md). It preserves the accepted
-v1.3.1 Suspend bytes and backs up the exact replaced files. An already accepted
+hashes described in [installation](INSTALLATION.md). It preserves the accepted architecture and backs up the exact replaced files; v1.4.1 itself requalifies updated shared Suspend runtime bytes. An already accepted
 S4 installation needs no reinstall for publication. Preserve the public v1.3.1
 asset and exact local deployment snapshots for rollback.
 
@@ -52,8 +62,8 @@ run it directly. An existing supported installation is detected automatically;
 
 ```bash
 sha256sum --ignore-missing -c SHA256SUMS
-chmod +x aag-external-storage-safe-suspend-linux-v1.4.0.run
-sudo ./aag-external-storage-safe-suspend-linux-v1.4.0.run
+chmod +x aag-external-storage-safe-suspend-linux-v1.4.1.run
+sudo ./aag-external-storage-safe-suspend-linux-v1.4.1.run
 ```
 
 The installer reports `FRESH_INSTALL`, `SAME_VERSION`, `UPGRADE`, or a precise
@@ -100,7 +110,7 @@ Hibernate defaults to disabled during an ordinary migration. On the documented
 reference platform, opt in during the same transaction with:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.4.0.run install \
+sudo ./aag-external-storage-safe-suspend-linux-v1.4.1.run install \
   --enable-reference-hibernate
 sudo aag-safe-suspend health-check
 ```

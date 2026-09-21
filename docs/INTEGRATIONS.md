@@ -2,7 +2,7 @@
 
 ## Qualified reference integrations
 
-v1.4.0 coordinates the reviewed AAG storage guard, recovery auditor, workload
+v1.4.1 coordinates the reviewed AAG storage guard, recovery auditor, workload
 adapters, FM350/T700 and LockLock through private pinned contracts. The reference
 blocker policy supports generic eligible ordinary userspace and supported guest
 shutdown, with independent storage release verification. See

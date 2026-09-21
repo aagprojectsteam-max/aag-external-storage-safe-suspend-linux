@@ -1,7 +1,7 @@
 # Portable ordinary Suspend USBClone gate
 
 This page describes the **portable profile's conservative read-only gate**.
-The v1.4.0 qualified reference transaction profile additionally supports reviewed
+The v1.4.1 qualified reference transaction profile additionally supports reviewed
 safe guest shutdown, followed by verified backing-file/mount release before
 stopping known gadget profiles. It never blindly kills a guest or detaches active
 guest USB. See [reference blocker policy](SAFETY-MODEL.md) and

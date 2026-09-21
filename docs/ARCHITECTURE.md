@@ -1,6 +1,6 @@
 # Architecture
 
-## v1.4.0 qualified reference stack
+## v1.4.1 qualified reference stack
 
 The reference adapter owns the complete ordinary-suspend lifecycle around the
 existing V2 storage/T700/LockLock stack. PREPARING_SLEEP resolves actual blockers;
@@ -64,7 +64,7 @@ The [acceptance matrix](ACCEPTANCE.md) records both Suspend and S4 qualification
 ## Portable profile architecture
 
 The remaining sections describe the separate portable profile retained in
-v1.4.0. Its older Hibernate service graph and conservative blocker policy do not
+v1.4.1. Its older Hibernate service graph and conservative blocker policy do not
 automatically become the qualified reference integration described above.
 
 ## Boundary and invariants

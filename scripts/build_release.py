@@ -14,9 +14,9 @@ import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 PROJECT = "aag-external-storage-safe-suspend-linux"
-EPOCH = 1789344000  # 2026-09-14T00:00:00Z
+EPOCH = 1789948800  # 2026-09-21T00:00:00Z
 EXCLUDES = {
     ".git",
     ".mypy_cache",
@@ -152,7 +152,7 @@ def build() -> dict[str, object]:
     release_manifest = {
         "product": PROJECT,
         "version": VERSION,
-        "release_date": "2026-09-14",
+        "release_date": "2026-09-21",
         "source_date_epoch": EPOCH,
         "minimum_upgrader_schema": 1,
         "upgrader_schema": 2,
@@ -161,7 +161,7 @@ def build() -> dict[str, object]:
         "migration_schema": 3,
         "systemd_wiring_revision": 3,
         "udev_rule_revision": 1,
-        "supported_upgrade_from": [">=1.0.0,<1.4.0"],
+        "supported_upgrade_from": [">=1.0.0,<1.4.1"],
         "supported_downgrade_from": [],
         "migration_ids": [
             "bootstrap-public-v1.0.0-to-installed-state-v1",
@@ -175,7 +175,7 @@ def build() -> dict[str, object]:
             "installer_command": "transaction",
             "scope": "QUALIFIED_EXISTING_V2_T700_LOCKLOCK_STACK",
             "automatic_portable_conversion": False,
-            "accepted_implementation_commit": "8c0095236f1095e29f5674db0a32476f431c964b",
+            "accepted_implementation_commit": "b0ebbb7e4a408dafe55652b0514c300f2a039c46",
             "runtime_sha256_manifest": "docs/transaction-runtime-sha256.json",
             "actual_physical_lid_acceptance": "PASS",
         },
@@ -193,7 +193,7 @@ def build() -> dict[str, object]:
             "installer_command": "hibernate",
             "scope": "QUALIFIED_EXISTING_V2_T700_LOCKLOCK_STACK",
             "automatic_portable_conversion": False,
-            "accepted_implementation_commit": "5cc43022551ad521f13af1eea72099b854e45230",
+            "accepted_implementation_commit": "b0ebbb7e4a408dafe55652b0514c300f2a039c46",
             "runtime_sha256_manifest": "docs/hibernate-runtime-sha256.json",
             "wwan_recovery_owner": "aag-hibernate-transaction-finish.service",
             "physical_s4_acceptance": "PASS",

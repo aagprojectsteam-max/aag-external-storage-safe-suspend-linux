@@ -1,10 +1,10 @@
 # Production-qualified plain Hibernate / S4
 
-v1.4.0 qualifies the reference Hibernate transaction on the
+v1.4.1 qualifies the reference Hibernate transaction on the
 [tested platform](TESTED-HARDWARE.md), with image resume, session recovery and
-usable cellular connectivity without a manual reboot. The accepted Suspend
-v1.3.1 runtime is preserved. Plain Hibernate is explicitly enabled and separately
-qualified; it is not a lid-close or Suspend-failure fallback. Hybrid sleep and
+usable cellular connectivity without a manual reboot. v1.4.1 requalifies the
+updated shared Suspend runtime together with the S4 extension. Plain Hibernate is
+explicitly enabled and separately qualified; it is not a lid-close or Suspend-failure fallback. Hybrid sleep and
 suspend-then-hibernate remain disabled and unaccepted.
 
 ## Prerequisites and readiness
@@ -60,7 +60,13 @@ The reference transaction follows this order:
 7. Verify terminal health, record `COMPLETE`, and release the fence to `IDLE`.
 
 Entry and power-off observations are recorded retrospectively when the evidence
-establishes a real image round trip. Internal DATA remains mounted and
+establishes a real image round trip. v1.4.1 also carries durable receipts for
+project-owned USB Clone profiles that were running before S4. Restoration resolves
+the configured user's trusted repository, validates the exact profile/backing and
+saved UDC, and starts it only after storage recovery; an identity change or failed
+restart remains explicit and retryable.
+
+Internal DATA remains mounted and
 identity-checked. UGREEN returns to a verified safely released state; this
 policy does not force-remount external partitions after re-enumeration. Required
 consumers needing such an automatic mount are refused until a safe restoration
@@ -100,5 +106,5 @@ The portable coordinator retains its older opt-in `install
 --enable-reference-hibernate` interface, `aag-safe-suspend health-check` gates and
 `aag-safe-suspend hibernate` entry point. That is a different graph and recovery
 contract, described under [portable architecture](ARCHITECTURE.md#portable-profile-architecture).
-A portable upgrade does not install the v1.4.0 qualified reference transaction
+A portable upgrade does not install the v1.4.1 qualified reference transaction
 extension. Do not mix the portable and reference commands or recovery owners.

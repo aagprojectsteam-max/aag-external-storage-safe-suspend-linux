@@ -180,7 +180,7 @@ class UpgradeTests(unittest.TestCase):
             self.logical("/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/cli.py")
         )
         result = INSTALLER.Installer(self.root, True).install(self.args)
-        self.assertEqual(result["installed_version"], "1.4.0")
+        self.assertEqual(result["installed_version"], "1.4.1")
         self.assertIn("bootstrap-public-v1.0.0-to-installed-state-v1", result["migrations_applied"])
         self.assertFalse(self.logical(INSTALLER.LEGACY_STATE).exists())
         with self.environment():
@@ -197,7 +197,7 @@ class UpgradeTests(unittest.TestCase):
         self.make_v111()
         old_config = self.logical(INSTALLER.CONFIG_PATH).read_bytes()
         result = INSTALLER.Installer(self.root, True).install(self.args)
-        self.assertEqual(result["installed_version"], "1.4.0")
+        self.assertEqual(result["installed_version"], "1.4.1")
         self.assertIn("config-schema-1-to-2-hibernate-policy", result["migrations_applied"])
         self.assertIn("wiring-revision-1-to-2-plain-hibernate", result["migrations_applied"])
         self.assertIn(
@@ -265,7 +265,7 @@ class UpgradeTests(unittest.TestCase):
             del state_value["files"][logical]
         init_logical = "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/__init__.py"
         init_path = self.logical(init_logical)
-        init_path.write_text(init_path.read_text().replace('"1.4.0"', '"1.2.0"'))
+        init_path.write_text(init_path.read_text().replace('"1.4.1"', '"1.2.0"'))
         state_value["files"][init_logical]["sha256"] = INSTALLER.sha256(init_path)
         state_value.update(
             installed_version="1.2.0",
@@ -283,7 +283,7 @@ class UpgradeTests(unittest.TestCase):
 
         old_dropin_bytes = dropin.read_bytes()
         result = INSTALLER.Installer(self.root, True).install(self.args)
-        self.assertEqual(result["installed_version"], "1.4.0")
+        self.assertEqual(result["installed_version"], "1.4.1")
         self.assertEqual(result["systemd_wiring_revision"], 3)
         self.assertIn(
             "wiring-revision-2-to-3-ordinary-usbclone-gate",
@@ -452,7 +452,7 @@ class UpgradeTests(unittest.TestCase):
         unit.write_text("corrupt\n")
         repair_args = argparse.Namespace(**{**vars(self.args), "repair": True})
         result = INSTALLER.Installer(self.root, True).install(repair_args)
-        self.assertEqual(result["installed_version"], "1.4.0")
+        self.assertEqual(result["installed_version"], "1.4.1")
         self.assertEqual(config_path.read_text(), custom)
         self.assertNotEqual(unit.read_text(), "corrupt\n")
 

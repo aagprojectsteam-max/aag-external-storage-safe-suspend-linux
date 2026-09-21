@@ -1,6 +1,6 @@
 # Production transaction adapter
 
-The reference host has a legacy V2 storage/T700 installation separate from the portable distribution. `aag-sleep-transaction` integrates that installation through SHA256-pinned adapters and gives ordinary suspend a single transaction owner. The v1.4.0 verified `.run transaction --config ... --report ...` entry point delegates to `scripts/deploy_transaction.py`. Use it only with an inspected host configuration and private report directory; it is not an automatic replacement for the portable installer. The installed configuration is root owned and mode 0600.
+The reference host has a legacy V2 storage/T700 installation separate from the portable distribution. `aag-sleep-transaction` integrates that installation through SHA256-pinned adapters and gives ordinary suspend a single transaction owner. The v1.4.1 verified `.run transaction --config ... --report ...` entry point delegates to `scripts/deploy_transaction.py`. Use it only with an inspected host configuration and private report directory; it is not an automatic replacement for the portable installer. The installed configuration is root owned and mode 0600.
 
 The transaction journal distinguishes accepted requests, kernel entry/exit, completed kernel cycles, measured hardware residency, and verified restoration. Old failures are reconciled before creating a new transaction. Retry accounting belongs to that transaction. A failed or stale callback cannot claim a new transaction. A recovery inhibitor includes `handle-lid-switch`, because a high-level sleep inhibitor alone does not suppress default logind lid handling.
 
@@ -18,13 +18,13 @@ At normal temperature, exhausting one retry does not cause automatic shutdown. M
 
 `scripts/accept_transaction.py` runs one explicitly authorized RTC-backed acceptance cycle, including stale-state reconciliation and safe handling of real blockers. Automated tests do not qualify hardware behavior. Physical lid-close/open acceptance must be recorded separately from an open-lid timed-wake test.
 
-The deployment manifest records source/installed hashes and the exact previous files. Rollback restores only those files and the enablement link, then reloads unit definitions. When several candidate deployments were applied, restore manifests in reverse deployment order to reach the original installation, including the original LockLock interface. Reload the affected daemon only while its controls are idle. Keep private identities, logs, workload paths and host policy outside public Git history. The v1.4.0 public release retains the adapter and publishes sanitized acceptance results; local identities and forensic originals remain excluded.
+The deployment manifest records source/installed hashes and the exact previous files. Rollback restores only those files and the enablement link, then reloads unit definitions. When several candidate deployments were applied, restore manifests in reverse deployment order to reach the original installation, including the original LockLock interface. Reload the affected daemon only while its controls are idle. Keep private identities, logs, workload paths and host policy outside public Git history. The v1.4.1 public release retains the adapter and publishes sanitized acceptance results; local identities and forensic originals remain excluded.
 
 The original v1.3.0 physical lid-close/open acceptance passed with one transaction and 112.615150 seconds of hardware/PMC low-power sleep. All 21 FM350/T700 checks passed, storage and session recovered, and COMPLETE returned to IDLE without retry, stale fence or poweroff. The prior interrupted cycle was excluded. The optional checkpoint API was unavailable and the resource-audit fallback succeeded. See [release notes](RELEASE-NOTES-v1.3.0.md) for scope and [installation](INSTALLATION.md) for the explicit profile boundary.
 
-The final v1.4.0 [acceptance matrix](ACCEPTANCE.md) also records the preserved
-v1.3.1 long-Suspend and LockLock OFF/ON qualification, plus separately qualified
-plain S4. The [Hibernate extension](hibernate-transaction.md) delegates ordinary
-Suspend to the accepted v1.3.1 bytes and owns S4 restoration through one finish
-service. Required consumers restore by saved policy before terminal completion;
+The final v1.4.1 [acceptance matrix](ACCEPTANCE.md) records the historical
+v1.3.1 long-Suspend and LockLock OFF/ON qualification and the new physical
+requalification of the updated shared Suspend runtime, plus separately qualified
+plain S4. The [Hibernate extension](hibernate-transaction.md) uses that requalified
+shared preparation/runtime and owns S4 restoration through one finish service. Required consumers restore by saved policy before terminal completion;
 the S4 memory, image and recovery gates do not become ordinary Suspend fallbacks.
