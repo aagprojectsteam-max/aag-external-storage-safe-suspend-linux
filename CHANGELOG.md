@@ -3,6 +3,28 @@
 All notable changes are documented here. This project follows Semantic
 Versioning.
 
+## 1.4.1 — 2026-09-21
+
+- Separate long-cycle hardware-residency qualification from operational resume
+  health so a PMC disagreement remains visible without falsely latching healthy
+  storage or modem restoration as failed.
+- Record durable if-was-running receipts for project-owned USB Clone profiles
+  stopped for Suspend and restore the exact validated profile/UDC only after
+  storage and device recovery are healthy.
+- Extend the same USB Clone restoration contract to Hibernate/S4, including
+  abort, cold-boot reconciliation and retryable restore-failure coverage.
+- Fix root-owned resume restoration to resolve the USB Clone repository from the
+  configured notification user's home rather than accidentally using /root.
+- Requalify the reference platform after HP W70 01.10.00, Intel ME
+  18.0.21.2801 and USB-C/PD 2.9.0: controlled Suspend achieved 22.954544 seconds
+  of matching hardware/PMC S0ix residency.
+- Requalify one physical S4 image round trip on the same post-firmware boot:
+  same-boot image resume, terminal COMPLETE, both USB Clone profiles restored,
+  cellular service recovered, and zero failed systemd units.
+- Refresh qualified runtime SHA256 manifests and release metadata. The automated
+  suite now contains 293 passing tests; the S4-focused qualification set passed
+  80 tests and the live requalification pinned 37 runtime files.
+
 ## 1.4.0 — 2026-09-14
 
 - Publish production-qualified reference Hibernate/S4 with one WWAN recovery

@@ -34,7 +34,7 @@ class ReleaseMetadataTests(unittest.TestCase):
                     "migration_schema": 3,
                     "systemd_wiring_revision": 3,
                     "udev_rule_revision": 1,
-                    "supported_upgrade_from": [">=1.0.0,<1.4.0"],
+                    "supported_upgrade_from": [">=1.0.0,<1.4.1"],
                     "supported_downgrade_from": [],
                     "migration_ids": [
                         "bootstrap-public-v1.0.0-to-installed-state-v1",
@@ -48,13 +48,13 @@ class ReleaseMetadataTests(unittest.TestCase):
                         "installer_command": "transaction",
                         "scope": "QUALIFIED_EXISTING_V2_T700_LOCKLOCK_STACK",
                         "automatic_portable_conversion": False,
-                        "accepted_implementation_commit": "8c0095236f1095e29f5674db0a32476f431c964b",
+                        "accepted_implementation_commit": "b0ebbb7e4a408dafe55652b0514c300f2a039c46",
                     },
                     "reference_hibernate": {
                         "installer_command": "hibernate",
                         "scope": "QUALIFIED_EXISTING_V2_T700_LOCKLOCK_STACK",
                         "automatic_portable_conversion": False,
-                        "accepted_implementation_commit": "5cc43022551ad521f13af1eea72099b854e45230",
+                        "accepted_implementation_commit": "b0ebbb7e4a408dafe55652b0514c300f2a039c46",
                         "runtime_sha256_manifest": "docs/hibernate-runtime-sha256.json",
                         "wwan_recovery_owner": "aag-hibernate-transaction-finish.service",
                         "physical_s4_acceptance": "PASS",
@@ -80,7 +80,7 @@ class ReleaseMetadataTests(unittest.TestCase):
 
     def test_consistent_release_metadata_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            result = validate_release.validate(self.fixture(Path(temporary)), "v1.4.0")
+            result = validate_release.validate(self.fixture(Path(temporary)), "v1.4.1")
         self.assertEqual(result["status"], "PASS")
 
     def test_asset_and_metadata_mismatch_fails(self) -> None:

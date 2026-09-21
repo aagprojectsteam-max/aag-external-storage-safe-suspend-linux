@@ -56,8 +56,8 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         or manifest["migration_schema"] != 3
         or manifest["systemd_wiring_revision"] != 3
     ):
-        raise RuntimeError("v1.4.0 schema or wiring metadata is inconsistent")
-    if ">=1.0.0,<1.4.0" not in manifest["supported_upgrade_from"]:
+        raise RuntimeError("v1.4.1 schema or wiring metadata is inconsistent")
+    if ">=1.0.0,<1.4.1" not in manifest["supported_upgrade_from"]:
         raise RuntimeError("public v1.0.0 bootstrap compatibility is not declared")
     required_migrations = {
         "bootstrap-public-v1.0.0-to-installed-state-v1",
@@ -91,14 +91,14 @@ def validate(dist: Path, expected_tag: str | None = None) -> dict[str, object]:
         raise RuntimeError("transaction adapter packaging scope mismatch")
     if (
         transaction.get("accepted_implementation_commit")
-        != "8c0095236f1095e29f5674db0a32476f431c964b"
+        != "b0ebbb7e4a408dafe55652b0514c300f2a039c46"
     ):
         raise RuntimeError("accepted implementation identity mismatch")
     if manifest["reference_hibernate"] != {
         "installer_command": "hibernate",
         "scope": "QUALIFIED_EXISTING_V2_T700_LOCKLOCK_STACK",
         "automatic_portable_conversion": False,
-        "accepted_implementation_commit": "5cc43022551ad521f13af1eea72099b854e45230",
+        "accepted_implementation_commit": "b0ebbb7e4a408dafe55652b0514c300f2a039c46",
         "runtime_sha256_manifest": "docs/hibernate-runtime-sha256.json",
         "wwan_recovery_owner": "aag-hibernate-transaction-finish.service",
         "physical_s4_acceptance": "PASS",

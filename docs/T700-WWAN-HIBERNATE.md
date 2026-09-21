@@ -1,6 +1,6 @@
 # FM350 / T700 WWAN recovery after Hibernate
 
-## Qualified v1.4.0 integration
+## Qualified v1.4.1 integration
 
 On the tested reference stack, **`aag-hibernate-transaction-finish.service` is
 the only S4 WWAN recovery owner**. Native and boot callbacks delegate restoration

@@ -1,6 +1,6 @@
 # Safety model
 
-## Qualified reference stack: v1.4.0
+## Qualified reference stack: v1.4.1
 
 The reference policy is **protect data → safely stop/release ordinary userspace
 blockers → enter sleep**. Known checkpoint or stop APIs are preferred. A normal

@@ -1,14 +1,14 @@
 # Upgrade test matrix
 
-## v1.4.0 accepted validation
+## v1.4.1 accepted validation
 
-The final automated suite passed **284 tests**, with passing main/tag CI and
-release validation. Built-asset checks exercised the portable installer, reference
-`transaction` route and explicit reference `hibernate` route in isolated roots.
-Actual public v1.3.1 bytes were used for portable upgrade and exact rollback.
-Both accepted reference runtime manifests remained pinned; live source/installed
-parity was 35 of 35. Anonymous verification covered 12 assets across the current
-release and preserved v1.3.0/v1.3.1 baselines.
+The v1.4.1 automated suite passed **293 tests** before publication. Built-asset
+checks exercise the portable installer, reference `transaction` route and explicit
+reference `hibernate` route in isolated roots. The immediate previous public
+v1.4.0 asset is used for direct patch upgrade and exact rollback, while older
+synthetic/public-baseline tests remain in the regression corpus. The physically
+requalified reference manifests pin 37 runtime/readiness files; post-firmware
+Suspend and S4 acceptance are recorded separately from package validation.
 
 S4 regressions cover callback lock handoff, late storage teardown, exactly one
 recovery owner, modem enumeration before profile activation, durable consumer

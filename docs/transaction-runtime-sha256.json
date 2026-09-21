@@ -1,10 +1,10 @@
 {
-  "accepted_implementation_commit": "8c0095236f1095e29f5674db0a32476f431c964b",
+  "accepted_implementation_commit": "b0ebbb7e4a408dafe55652b0514c300f2a039c46",
   "sha256": {
     "src/aag-sleep-transaction": "e11edbd087b9017f09ccc36e10362b8ba72917c5208e07300d1da744b0e4789c",
     "src/aag_safe_suspend/locklock_compat.py": "1702d7a7c6b0af6481d290f4c49cef5b4535bfb63a8ea774721a49033b335ad0",
-    "src/aag_safe_suspend/production.py": "945f3fd1d1c1e6a3d37421eab44ca4a6b5d985962480a59d268fc7d6411e8f1c",
-    "src/aag_safe_suspend/transaction.py": "9de9867ce79b38090bbaec0d8e0cbac2922aa8a1ce8f5c7b6732ee33438337f4",
+    "src/aag_safe_suspend/production.py": "f75f92d1682b30a60dab10de5a5b9c9527183ef6ccbe394eefc4334cf4bb2d84",
+    "src/aag_safe_suspend/transaction.py": "ea8e61a25d6f367dccb48bd77217a61d60b265be558353c6ab8e7eabd948ba18",
     "src/aag_safe_suspend/workloads.py": "620cfbfbfb384e1cfd5e701877638e50af8bd22311380692ddf9001e53edfeb4",
     "systemd/production/aag-sleep-transaction-boot.service": "4ad754ec24c48d21b69cc5207a494d72c85259cfaf0392fe7db6d283109ed14b",
     "systemd/production/failure.conf": "c8fec0da7c3319a71e118bd2f8e186d5362e81013cb7bc12c402c90193e58213",
@@ -16,5 +16,5 @@
     "src/reference-transaction-init.py": "748c80a2aa4fd0fba0a1e974b9825e02254740e2043ba638076f11084f24cac4"
   },
   "baseline_accepted_implementation_commit": "18c23506f89943af65e62c6cce24d45462515994",
-  "qualification_note": "v1.3.1 preserves the v1.3.0 transaction architecture and adds confirmed absence handling for collected systemd user units."
+  "qualification_note": "v1.4.1 requalifies the reference transaction after resume-health separation and durable USB Clone restoration; post-firmware physical Suspend achieved matching kernel and PMC S0ix residency."
 }

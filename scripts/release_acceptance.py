@@ -15,7 +15,7 @@ from pathlib import Path
 import deploy_hibernate
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 
 
 def sha256(path: Path) -> str:
@@ -44,15 +44,16 @@ def previous_release_acceptance(asset: Path, previous: Path, directory: Path) ->
     if sha256(previous_copy) != sha256(previous):
         raise RuntimeError("previous-release working copy differs from preserved asset")
     previous = previous_copy
-    root = directory / "public-v1.3.1-root"
+    root = directory / "previous-public-release-root"
     root.mkdir()
     run([str(previous), "verify-source"])
     common = ["--root", str(root), "--test-mode"]
     run([str(previous), *common, "install", "--config", str(ROOT / "tests/fixtures/config.json")])
     state_path = root / "var/lib/aag-external-storage-safe-suspend/install-state.json"
     before = json.loads(state_path.read_text())
-    if before["installed_version"] != "1.3.1":
-        raise RuntimeError("previous asset is not the accepted v1.3.1 baseline")
+    previous_version = before["installed_version"]
+    if previous_version != "1.4.0":
+        raise RuntimeError("previous asset is not the accepted v1.4.0 baseline")
     originals = {
         name: (sha256(root / name.lstrip("/")), (root / name.lstrip("/")).stat().st_mode & 0o777)
         for name in before["files"]
@@ -65,10 +66,10 @@ def previous_release_acceptance(asset: Path, previous: Path, directory: Path) ->
     result = subprocess.run(
         [str(cli), "rollback"], env=env, capture_output=True, text=True, timeout=60
     )
-    if result.returncode or '"to_version": "1.3.1"' not in result.stdout:
+    if result.returncode or f'"to_version": "{previous_version}"' not in result.stdout:
         raise RuntimeError("actual previous-release rollback failed")
     restored = json.loads(state_path.read_text())
-    if restored["installed_version"] != "1.3.1":
+    if restored["installed_version"] != previous_version:
         raise RuntimeError("rollback did not restore previous version")
     for name, expected in originals.items():
         path = root / name.lstrip("/")
@@ -77,7 +78,7 @@ def previous_release_acceptance(asset: Path, previous: Path, directory: Path) ->
     version = subprocess.run(
         [str(cli), "--version"], env=env, capture_output=True, text=True, timeout=30
     )
-    if version.returncode or version.stdout.strip() != "1.3.1":
+    if version.returncode or version.stdout.strip() != previous_version:
         raise RuntimeError("rolled-back CLI did not execute previous version")
     run([str(previous), *common, "uninstall"])
 
@@ -295,8 +296,8 @@ def main() -> int:
         upgrade_state_path.write_text(json.dumps(upgrade_state, sort_keys=True, indent=2) + "\n")
         upgrade_state_path.chmod(0o600)
         upgraded = run(upgrade_common + ["install"])
-        if '"installed_version": "1.4.0"' not in upgraded.stdout:
-            raise RuntimeError("v1.1.1 fixture did not upgrade to v1.4.0")
+        if '"installed_version": "1.4.1"' not in upgraded.stdout:
+            raise RuntimeError("v1.1.1 fixture did not upgrade to v1.4.1")
         upgrade_env = {
             **os.environ,
             "AAG_SAFE_SUSPEND_ROOT": str(upgrade_root),
@@ -311,7 +312,7 @@ def main() -> int:
             env=upgrade_env,
         )
         if rolled_back.returncode or '"to_version": "1.1.1"' not in rolled_back.stdout:
-            raise RuntimeError("v1.4.0 rollback did not restore v1.1.1")
+            raise RuntimeError("v1.4.1 rollback did not restore v1.1.1")
         run(upgrade_common + ["uninstall"])
 
         # Exercise the patch-release boundary separately.  This sanitized
@@ -377,7 +378,7 @@ def main() -> int:
             del patch_state["files"][logical]
         init_logical = "/usr/lib/aag-external-storage-safe-suspend/aag_safe_suspend/__init__.py"
         init_path = patch_root / init_logical.removeprefix("/")
-        init_path.write_text(init_path.read_text().replace('"1.4.0"', '"1.2.0"'))
+        init_path.write_text(init_path.read_text().replace('"1.4.1"', '"1.2.0"'))
         patch_state["files"][init_logical]["sha256"] = sha256(init_path)
         patch_state.update(
             installed_version="1.2.0",
@@ -393,8 +394,8 @@ def main() -> int:
         patch_state_path.write_text(json.dumps(patch_state, sort_keys=True, indent=2) + "\n")
         patch_state_path.chmod(0o600)
         patch_upgrade = run(patch_common + ["install"])
-        if '"installed_version": "1.4.0"' not in patch_upgrade.stdout:
-            raise RuntimeError("v1.2.0 fixture did not upgrade to v1.4.0")
+        if '"installed_version": "1.4.1"' not in patch_upgrade.stdout:
+            raise RuntimeError("v1.2.0 fixture did not upgrade to v1.4.1")
         if not (patch_root / new_paths[0].removeprefix("/")).is_file():
             raise RuntimeError("v1.2.0 upgrade omitted the ordinary USBClone unit")
         patch_env = {
@@ -411,11 +412,11 @@ def main() -> int:
             env=patch_env,
         )
         if patch_rollback.returncode or '"to_version": "1.2.0"' not in patch_rollback.stdout:
-            raise RuntimeError("v1.4.0 rollback did not restore v1.2.0")
+            raise RuntimeError("v1.4.1 rollback did not restore v1.2.0")
         if dropin_path.read_bytes() != old_dropin:
             raise RuntimeError("v1.2.0 ordinary graph bytes were not restored")
         if (patch_root / new_paths[0].removeprefix("/")).exists():
-            raise RuntimeError("v1.2.0 rollback retained the v1.4.0 ordinary unit")
+            raise RuntimeError("v1.2.0 rollback retained the v1.4.1 ordinary unit")
         run(patch_common + ["uninstall"])
 
         # Exercise the packaged reference-adapter dispatch, not just module tests.
@@ -474,12 +475,12 @@ def main() -> int:
     print("SELF_EXTRACT_CHECKSUM=PASS")
     print("RELEASE_INSTALLER_TEST=PASS")
     print("RELEASE_ROLLBACK_TEST=PASS")
-    print("UPGRADE_1_1_1_TO_1_4_0=PASS")
-    print("UPGRADE_1_2_0_TO_1_4_0=PASS")
+    print("UPGRADE_1_1_1_TO_1_4_1=PASS")
+    print("UPGRADE_1_2_0_TO_1_4_1=PASS")
     print("REFERENCE_TRANSACTION_PAYLOAD_AND_ROLLBACK=PASS")
     print("REFERENCE_HIBERNATE_PAYLOAD_AND_ROLLBACK=PASS")
     if args.previous_asset:
-        print("ACTUAL_PUBLIC_V1_3_1_UPGRADE_AND_ROLLBACK=PASS")
+        print("ACTUAL_PUBLIC_V1_4_0_UPGRADE_AND_ROLLBACK=PASS")
     print("POWER_STATE_ACTIONS=NONE")
     return 0
 

@@ -1,7 +1,7 @@
 # Portable Timeshift integration
 
 This optional wrapper/fence belongs to the portable profile. It is not required
-for generic ordinary-userspace blocker handling in the qualified v1.4.0
+for generic ordinary-userspace blocker handling in the qualified v1.4.1
 reference stack; that policy is documented in [the safety model](SAFETY-MODEL.md).
 
 Timeshift integration is optional. With `--timeshift`, the installer uses

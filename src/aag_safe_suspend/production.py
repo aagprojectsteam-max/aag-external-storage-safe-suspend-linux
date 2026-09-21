@@ -13,6 +13,7 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import pwd
 import re
 import stat
 import subprocess
@@ -278,6 +279,7 @@ class Host:
         self.r.validate_automount_marker_for_release(self.value)
         workloads.restore(self.cfg["workloads"], self.value.get("stopped_workloads", []),
                           self.workload_run, lambda: self.save())
+        self.restore_clones()
         with self.r.state_lock():
             if self.r.load_state().get("episode") != self.value.get("episode"):
                 raise rules.Refusal("reconciliation owner changed")
@@ -499,7 +501,11 @@ class Host:
         latch = self.t.read_json(self.t.BLOCKED)
         result = self.t.read_json(self.t.LAST)
         out = Path(str(result.get('directory', '')))
-        if (latch.get('reason') != 'Automatic suspend/resume verification failed'
+        historical_qualification_reasons = {
+            'Automatic suspend/resume verification failed',
+            'Device health verification failed',
+        }
+        if (latch.get('reason') not in historical_qualification_reasons
                 or latch.get('boot_id') != self.r.boot_id() or result.get('boot_id') != self.r.boot_id()
                 or out.parent != self.t.STATE or not out.name.startswith('cycle-')
                 or latch.get('extra') != str(out) or not rules.device_health(result)):
@@ -545,6 +551,7 @@ class Host:
         self.update(stage="RESTORE_WORKLOADS", storage_state="HEALTHY", terminal_ugreen_reaudit=terminal)
         workloads.restore(self.cfg["workloads"], self.value.get("stopped_workloads", []),
                           self.workload_run, lambda: self.save())
+        self.restore_clones()
         if self.r.lid_state() == 'closed' and not lid_ignored():
             self.failed('WAKE_WHILE_LID_CLOSED', 'healthy resume while lid remains closed; bounded retry required')
             raise rules.Refusal('lid remains closed after resume')
@@ -679,6 +686,25 @@ class Host:
                     raise
                 resolved.add(key)
 
+    def clone_repository(self, configured):
+        configured_repo = configured.get("repository")
+        if configured_repo:
+            repository = Path(configured_repo)
+        else:
+            user = self.cfg.get("notification_user")
+            if not user:
+                raise rules.Refusal("USB Clone repository owner is not configured")
+            try:
+                repository = Path(pwd.getpwnam(user).pw_dir) / "USB-CLONES"
+            except KeyError:
+                raise rules.Refusal("USB Clone repository owner does not exist") from None
+        if repository.is_symlink() or not repository.is_dir():
+            raise rules.Refusal("USB Clone repository is unavailable")
+        expected_uid = self.cfg.get("notification_uid")
+        if expected_uid is not None and repository.stat().st_uid != int(expected_uid):
+            raise rules.Refusal("USB Clone repository ownership changed")
+        return repository
+
     def clone_inventory(self):
         root = Path("/sys/kernel/config/usb_gadget")
         if not root.exists():
@@ -786,7 +812,8 @@ class Host:
             raise rules.Refusal("USB Clone resources changed during graceful release")
         self.update(usbclone_stopped=self.value.get("usbclone_stopped", []), stage="QUIESCE_NONESSENTIAL_WORKLOADS")
         for clone in clones:
-            receipt = {**clone, "status": "STOP_REQUESTED", "restart_after_resume": "never"}
+            receipt = {**clone, "status": "STOP_REQUESTED", "was_running": True,
+                       "restart_after_resume": "if_was_running"}
             self.value["usbclone_stopped"].append(receipt)
             self.save()
             self.emit("BLOCKER_STOP_REQUESTED", workload=clone["name"], policy="unused-known-virtual-device")
@@ -805,7 +832,93 @@ class Host:
                 if time.monotonic() >= deadline:
                     raise
                 time.sleep(0.2)  # wait for actual kernel disconnect, not just udev's queue
-        self.emit("BLOCKER_STOP_RESULT", workload="USB Clone", success=True, restore="manual")
+        self.emit("BLOCKER_STOP_RESULT", workload="USB Clone", success=True,
+                  restore="if_was_running")
+
+    def restore_clones(self):
+        receipts = [
+            row for row in self.value.get("usbclone_stopped", [])
+            if row.get("status") == "STOPPED"
+            and row.get("was_running") is True
+            and row.get("restart_after_resume") == "if_was_running"
+        ]
+        if not receipts:
+            return
+        configured = self.cfg.get("usbclone")
+        if not configured:
+            raise rules.Refusal("USB Clone restore policy disappeared")
+        command = Path(configured["command"])
+        trusted(command)
+        if hashlib.sha256(command.read_bytes()).hexdigest() != configured["sha256"]:
+            raise rules.Refusal("USB Clone command changed before restore")
+        profiles = configured.get("profiles", {})
+        repository = self.clone_repository(configured)
+
+        def matches(row, receipt):
+            profile = receipt["name"].removeprefix("usbclone_")
+            return (
+                row.get("name") == receipt.get("name")
+                and re.fullmatch(r"dummy_udc\.[0-9]+", str(row.get("udc", ""))) is not None
+                and row.get("functions") == ["mass_storage.0"]
+                and row.get("backings") == [profiles.get(profile)]
+            )
+
+        for receipt in receipts:
+            name = receipt.get("name", "")
+            profile = name.removeprefix("usbclone_")
+            if (not name.startswith("usbclone_") or profile not in profiles
+                    or receipt.get("functions") != ["mass_storage.0"]
+                    or receipt.get("backings") != [profiles[profile]]):
+                raise rules.Refusal("USB Clone restore receipt no longer matches configured profile")
+            current = self.clone_inventory()
+            if any(row.get("name") == name for row in current):
+                if not any(matches(row, receipt) for row in current):
+                    raise rules.Refusal("USB Clone identity changed before restore")
+                receipt["status"] = "RESTORED"
+                self.save()
+                continue
+            profile_dir = repository / "profiles" / profile
+            if not profile_dir.exists():
+                raise rules.Refusal("USB Clone profile is missing from configured repository")
+            backing = profile_dir / "disk.img"
+            if not backing.exists() or backing.resolve() != Path(profiles[profile]).resolve():
+                raise rules.Refusal("USB Clone repository profile does not match configured backing")
+            receipt["status"] = "RESTORE_REQUESTED"
+            self.save()
+            self.emit("BLOCKER_RESTORE_REQUESTED", workload=name, profile=profile)
+            run([
+                "/usr/bin/env",
+                f"USB_CLONE_HOME={repository}",
+                configured["command"],
+                "start",
+                profile,
+                receipt["udc"],
+            ], timeout=30)
+            run(["/usr/bin/udevadm", "settle", "--timeout=5"], timeout=7)
+            deadline = time.monotonic() + 7
+            while True:
+                current = self.clone_inventory()
+                if any(matches(row, receipt) for row in current):
+                    break
+                if time.monotonic() >= deadline:
+                    receipt["status"] = "RESTORE_FAILED"
+                    self.save()
+                    raise rules.Refusal("USB Clone restart was not verified")
+                time.sleep(0.2)
+            receipt["status"] = "RESTORED"
+            self.save()
+            self.emit("BLOCKER_RESTORE_RESULT", workload=name, success=True)
+
+    def manual_reconcile(self):
+        with self.r.state_lock():
+            self.value = self.r.load_state()
+        if self.value.get("state") == "IDLE":
+            return
+        if self.live_owner(self.value):
+            raise rules.Refusal("manual reconciliation refused while a sleep transaction owner is active")
+        if self.r.lid_state() != "open" and not lid_ignored():
+            raise rules.Refusal("manual reconciliation requires an open lid")
+        self.reconcile()
 
     def notify(self, reason):
         user = self.cfg.get("notification_user")
@@ -953,7 +1066,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("begin", "verify-release", "v2-teardown", "native-pre",
         "native-post", "resume-verify-begin", "resume-verify-device", "resume-verify-terminal", "failure-recover",
-        "retry-suspend", "boot-reconcile", "kernel-resumed", "status", "audit"))
+        "retry-suspend", "boot-reconcile", "reconcile-now", "kernel-resumed", "status", "audit"))
     parser.add_argument("--t700-failsafe", nargs=2)  # compatibility declaration, NEVER executed
     args = parser.parse_args()
     if os.geteuid() != 0:
@@ -966,6 +1079,7 @@ def main():
         "resume-verify-begin": host.resume_begin, "resume-verify-terminal": host.resume_terminal,
         "resume-verify-device": host.verify_device,
         "failure-recover": host.monitor, "retry-suspend": host.retry, "boot-reconcile": host.boot,
+        "reconcile-now": host.manual_reconcile,
         "status": lambda: print(json.dumps(host.r.load_state(), sort_keys=True)),
         "audit": lambda: print(json.dumps({"ugreen": host.audit_storage(),
                     "usbclone": host.clone_audit(host.clone_inventory()),

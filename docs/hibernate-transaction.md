@@ -70,7 +70,7 @@ dispatch a power transition or publish a release. It adds the S4 unit graph and
 reloads systemd only after validation. Original files and permissions are
 preserved in its rollback manifest.
 
-v1.4.0 exposes that same deployer through the verified `.run` asset's `hibernate`
+v1.4.1 exposes that same deployer through the verified `.run` asset's `hibernate`
 command. Supply `--config <private-hibernate-config> --gates <verified-gates>`
 and `--baseline <accepted-installed-baseline>` with a private `--report`
 directory. These files must describe this host's reviewed dependencies and

@@ -1,6 +1,6 @@
 # Troubleshooting
 
-## v1.4.0 reference transaction stack
+## v1.4.1 reference transaction stack
 
 Identify the profile first. The reference adapter records the episode, stage,
 first failure, process stop receipts, kernel entry/exit and actual sleep. A
@@ -65,7 +65,7 @@ and diagnose the exact failure without PCI resets, driver reloads, AT commands,
 GNSS activation or a second physical S4 experiment. A reboot restoring service
 would still leave the preceding Hibernate acceptance failed.
 
-The preceding lock-collision defect is fixed in v1.4.0. Late storage teardown
+The preceding lock-collision defect is fixed in v1.4.1. Late storage teardown
 must finish before the sole owner acquires the lock; modem enumeration must
 finish before profile activation. Compare those stages with the saved evidence.
 See [WWAN recovery](T700-WWAN-HIBERNATE.md) for the qualified behavior.

@@ -3,15 +3,16 @@
 The private engineering evidence was reviewed and normalized; raw logs, serials,
 UUIDs, paths, process dumps, and unrelated application data are not published.
 
-## Final production qualification: v1.4.0
+## Final production qualification: v1.4.1
 
-The public release is `v1.4.0`, release commit
-`74a0b48`; the local production checkpoint is retained separately. A later
-documentation-only commit on `main` does not change this immutable release identity.
+v1.4.1 pins the physically requalified reference runtime after the post-v1.4.0
+resume-health and USB Clone fixes. The accepted implementation checkpoint is
+b0ebbb7e4a408dafe55652b0514c300f2a039c46; publication/tag identity is tracked
+separately so the earlier v1.4.0 release evidence remains immutable.
 
 | Gate | Accepted result |
 |---|---|
-| Automated suite / CI | 284 PASS / PASS |
+| Automated suite / CI | 293 PASS / PASS |
 | Physical normal lid-close Suspend | PASS; one transaction and real low-power sleep |
 | Long Suspend | PASS |
 | Ordinary userspace blocker handling | PASS |
@@ -33,14 +34,14 @@ documentation-only commit on `main` does not change this immutable release ident
 | Filesystem health | PASS; online checks |
 | Full Hibernate acceptance | PASS |
 | Accepted Suspend v1.3.1 baseline | PRESERVED |
-| Source/installed SHA256 parity | 35 OF 35 |
+| Qualified runtime pin/readiness parity | 37 OF 37 |
 | Exact rollback | VERIFIED; v1.3.1 baseline retained |
-| Anonymous public release verification | PASS; 12 assets across v1.3.0, v1.3.1 and v1.4.0 |
+| Prior anonymous public release verification | PASS through v1.4.0; v1.4.1 is verified separately after publication |
 
-The final suite has 284 tests; the 283-test count in the release's pre-physical
-record precedes the additional release metadata regression. Packaging verified
-both reference routes and actual public v1.3.1 portable upgrade/exact rollback
-in isolated roots. It did not require another physical cycle.
+The v1.4.1 suite has 293 tests. A dedicated post-firmware S4 set passed 80 tests,
+and the live readiness/deployment requalification pinned 37 files. Packaging
+validates the reference transaction and Hibernate routes plus upgrade/rollback
+boundaries in isolated roots; physical acceptance remains a separate evidence layer.
 
 The preceding real S4 image resume with WWAN lock collision remains
 `PARTIAL_PASS_WWAN_FAILURE`, with a manual reboot required for modem recovery.
@@ -55,6 +56,23 @@ external-partition remounts; consumer restoration respects `never` policies.
 GNSS remains on demand. Long-term endurance and arbitrary hardware/firmware are
 not qualified. See [tested hardware](TESTED-HARDWARE.md) and
 [Hibernate recovery](T700-WWAN-HIBERNATE.md).
+
+### v1.4.1 post-firmware requalification
+
+The reference machine repeatedly completed kernel s2idle entry/exit while
+recording zero sustained S0ix residency on HP W70 01.09.02. Device-health checks,
+GNSS-off and Bluetooth-off A/B tests did not account for that platform result.
+After installing HP W70 01.10.00, Intel ME 18.0.21.2801 and USB-C/PD 2.9.0,
+the first controlled Suspend recorded last_hw_sleep=22954544 microseconds and
+an exactly matching PMC SLP_S0 delta. Both saved USB Clone profiles restored and
+no systemd unit failed.
+
+A subsequent physical Hibernate wrote the image, powered off, and resumed the
+same boot after manual power-on. The S4 transaction reached COMPLETE, both USB
+Clone profiles restored to their saved UDCs, the saved cellular connection
+returned, and the failed-unit set remained empty. The experiment updates the
+tested firmware boundary; it does not prove which individual BIOS/ME/PD component
+was solely causal because the vendor firmware bundle updated them together.
 
 ## Historical portable Suspend acceptance
 

@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from aag_safe_suspend import locklock_compat as ll
@@ -325,6 +326,11 @@ class ResumeHealthTests(unittest.TestCase):
         )
         self.assertTrue(tx.device_health(result))
 
+    def test_pmc_counter_disagreement_is_qualification_not_device_health(self):
+        result = self.result()
+        result["checks"]["pmc_agrees_with_hardware_counter"] = False
+        self.assertTrue(tx.device_health(result))
+
     def test_every_actual_health_failure_remains_a_failure(self):
         for key in tx.HEALTH_CHECKS:
             result = self.result()
@@ -414,6 +420,17 @@ class DeviceAdapterTests(unittest.TestCase):
         self.host.t.block.assert_not_called()
         self.assertFalse(self.host.t.QUEUE.exists())
 
+    def test_pmc_mismatch_preserves_qualification_failure_without_health_latch(self):
+        self.result["checks"]["pmc_agrees_with_hardware_counter"] = False
+        self.host.verify_device()
+        self.assertTrue(self.state["device_health"])
+        self.assertEqual(self.state["device_result"]["outcome"], "HEALTHY_RESUME")
+        self.assertEqual(
+            self.state["device_result"]["qualification_outcome"],
+            "NOT_ACCEPTED_REVIEW_REQUIRED",
+        )
+        self.host.t.block.assert_not_called()
+
     def test_data_health_failure_remains_a_real_failure(self):
         self.host.t.core.data_state = lambda: {"healthy": False}
         with self.assertRaises(tx.Refusal):
@@ -437,6 +454,59 @@ class DeviceAdapterTests(unittest.TestCase):
                 self.host.resume_terminal()
         self.assertEqual(self.state["stage"], "WAKE_WHILE_LID_CLOSED")
         self.assertEqual(self.state["retry_count"], 0)
+
+
+class HistoricalQualificationLatchTests(unittest.TestCase):
+    def test_old_device_health_wording_can_clear_only_when_new_health_is_clean(self):
+        from test_transaction import HostTests
+
+        fixture = HostTests(methodName="runTest")
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        host, state, root = fixture.host, fixture.state, fixture.root
+        out = root / "cycle-historical"
+        out.mkdir()
+        host.t.STATE = root
+        host.t.BLOCKED.touch()
+        state["native_invocation"] = "native"
+        host.value = copy.deepcopy(state)
+        clean = {"checks": {k: True for k in tx.HEALTH_CHECKS}}
+        clean["checks"]["pmc_agrees_with_hardware_counter"] = False
+        result = {
+            **clean,
+            "directory": str(out),
+            "boot_id": "boot",
+        }
+        latch = {
+            "reason": "Device health verification failed",
+            "boot_id": "boot",
+            "extra": str(out),
+        }
+        restored = {
+            "invocation": "native",
+            "before": {"policy": {}, "data": {"healthy": True}},
+            "cellular_before": {"healthy": True, "connection_uuid": "connection"},
+        }
+
+        def read_json(path):
+            if path == host.t.BLOCKED:
+                return latch
+            if path == host.t.LAST:
+                return result
+            if path == out / "transaction-restored.json":
+                return restored
+            raise AssertionError(path)
+
+        host.t.read_json = read_json
+        host.t.check_host = Mock()
+        host.t.config = lambda: {}
+        host.t.policy = lambda: {}
+        host.t.core = SimpleNamespace(
+            data_state=lambda: {"healthy": True},
+            cellular=lambda: {"healthy": True, "connection_uuid": "connection"},
+        )
+        host.reconcile_qualification_latch()
+        self.assertFalse(host.t.BLOCKED.exists())
 
 
 class QueueRecoveryTests(unittest.TestCase):

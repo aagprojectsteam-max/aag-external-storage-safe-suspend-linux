@@ -48,7 +48,7 @@ A validated production cycle demonstrated clean DATA unmount, suspend, clean res
 
 ## Hibernate
 
-The project later expanded to full hibernate support. Hibernate has its own requirements and evidence and must not be inferred from suspend success. `docs/HIBERNATE.md` is the authoritative setup/behavior reference. The public line subsequently reached **v1.4.0** with full hibernate/session-restoration acceptance recorded during the project lifecycle.
+The project later expanded to full hibernate support. Hibernate has its own requirements and evidence and must not be inferred from suspend success. `docs/HIBERNATE.md` is the authoritative setup/behavior reference. The public line subsequently reached **v1.4.1** with full hibernate/session-restoration acceptance recorded during the project lifecycle.
 
 ## Installation and lifecycle
 
@@ -87,4 +87,8 @@ Do not erase failed experiments such as D3cold-only mitigation or the inhibitor/
 
 ## Current handoff status
 
-As of the 2026-09-15 documentation audit, this repository already had one of the portfolio's strongest documentation sets. This handoff adds the missing chronological/maintenance narrative connecting architecture, acceptance, hibernate and publication evidence.
+The 2026-09-21 follow-up requalified the reference stack after runtime recovery fixes and a platform-firmware update. The adapter now separates qualification-only PMC disagreements from operational device health, records and restores exact project-owned USB Clone profiles for Suspend and S4, and resolves the clone repository from the configured user even when restoration runs as root.
+
+On the tested HP EliteBook, HP W70 01.10.00 with Intel ME 18.0.21.2801 and USB-C/PD 2.9.0 restored real S0ix residency after the preceding firmware repeatedly completed kernel s2idle with zero hardware low-power residency. One controlled post-update Suspend and one physical same-boot Hibernate then passed with terminal recovery, both saved USB Clone profiles restored and cellular service recovered.
+
+v1.4.1 publishes those requalified runtime bytes while preserving the historical v1.4.0 release and its evidence unchanged. The firmware bundle changed several platform components together, so the evidence establishes the tested firmware stack as the qualification boundary; it does not identify one BIOS, ME or PD component as the sole cause.

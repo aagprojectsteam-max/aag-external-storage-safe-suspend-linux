@@ -1,10 +1,12 @@
 # Tested hardware and support matrix
 
-## Production-qualified reference configuration: v1.4.0
+## Production-qualified reference configuration: v1.4.1
 
 | Component | Accepted reference context |
 |---|---|
 | Operating system / desktop | Ubuntu Desktop 26.04 LTS / GNOME on Wayland |
+| Reference laptop | HP EliteBook 840 14 inch G11 |
+| Qualified firmware | HP W70 01.10.00; Intel ME 18.0.21.2801; USB-C/PD 2.9.0 |
 | Suspend | s2idle; normal physical lid-close and long Suspend qualified |
 | Hibernate | Plain S4 with image and session restoration |
 | Memory / swap | 64 GiB RAM / 72 GiB internal ext4 swapfile |
@@ -37,7 +39,7 @@ These design capabilities do not establish physical qualification on another hos
 
 The portable and reference graphs are separate installation profiles. The older
 portable ext4/Timeshift and USBClone results remain historical acceptance records.
-They do not extend the v1.4.0 S4 reference claim to every integration.
+They do not extend the v1.4.1 S4 reference claim to every integration.
 
 ## Not qualified by this result
 

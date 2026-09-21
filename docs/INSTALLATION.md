@@ -1,4 +1,4 @@
-# Installation profiles in v1.4.0
+# Installation profiles in v1.4.1
 
 The verified `.run` asset contains the portable coordinator and the qualified
 reference transaction adapter. Choose one graph owner; the installer does not
@@ -67,10 +67,10 @@ legacy stack. The automated and built-asset acceptance cover both profiles.
 
 ## Qualified reference Hibernate extension
 
-After the reference prerequisites are established, use the verified v1.4.0 asset:
+After the reference prerequisites are established, use the verified v1.4.1 asset:
 
 ```bash
-sudo ./aag-external-storage-safe-suspend-linux-v1.4.0.run hibernate --config <private-hibernate-config> --gates <verified-gates-json> --baseline <accepted-baseline-json> --report <private-report-directory>
+sudo ./aag-external-storage-safe-suspend-linux-v1.4.1.run hibernate --config <private-hibernate-config> --gates <verified-gates-json> --baseline <accepted-baseline-json> --report <private-report-directory>
 ```
 
 The baseline JSON is a list of installed absolute paths and expected SHA256
