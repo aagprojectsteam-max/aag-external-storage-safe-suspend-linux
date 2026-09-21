@@ -36,7 +36,7 @@ separately so the earlier v1.4.0 release evidence remains immutable.
 | Accepted Suspend v1.3.1 baseline | PRESERVED |
 | Qualified runtime pin/readiness parity | 37 OF 37 |
 | Exact rollback | VERIFIED; v1.3.1 baseline retained |
-| Prior anonymous public release verification | PASS through v1.4.0; v1.4.1 is verified separately after publication |
+| Public v1.4.1 release verification | PASS; tag, CI/Release workflows and 4 re-downloaded asset hashes verified |
 
 The v1.4.1 suite has 293 tests. A dedicated post-firmware S4 set passed 80 tests,
 and the live readiness/deployment requalification pinned 37 files. Packaging
