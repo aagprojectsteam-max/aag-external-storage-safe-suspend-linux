@@ -456,8 +456,6 @@ class DeviceAdapterTests(unittest.TestCase):
         self.assertEqual(self.state["retry_count"], 0)
 
 
-
-
 class HistoricalQualificationLatchTests(unittest.TestCase):
     def test_old_device_health_wording_can_clear_only_when_new_health_is_clean(self):
         from test_transaction import HostTests
@@ -509,6 +507,7 @@ class HistoricalQualificationLatchTests(unittest.TestCase):
         )
         host.reconcile_qualification_latch()
         self.assertFalse(host.t.BLOCKED.exists())
+
 
 class QueueRecoveryTests(unittest.TestCase):
     def setUp(self):

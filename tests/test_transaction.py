@@ -560,7 +560,7 @@ class ClonePolicyTests(unittest.TestCase):
         self.assertEqual(self.state["usbclone_stopped"][0]["status"], "RESTORED")
 
     def test_clone_repository_falls_back_to_notification_users_home_not_root_home(self):
-        command = self.setup_clone()
+        self.setup_clone()
         repository = Path(self.host.cfg["usbclone"].pop("repository"))
         self.host.cfg["notification_user"] = "reference-user"
         self.host.cfg["notification_uid"] = repository.stat().st_uid
@@ -575,7 +575,11 @@ class ClonePolicyTests(unittest.TestCase):
         self.host.clone_inventory = Mock(side_effect=[[], [self.clone]])
         with (
             patch.object(production, "trusted"),
-            patch.object(production.pwd, "getpwnam", return_value=SimpleNamespace(pw_dir=str(repository.parent))),
+            patch.object(
+                production.pwd,
+                "getpwnam",
+                return_value=SimpleNamespace(pw_dir=str(repository.parent)),
+            ),
             patch.object(production, "run") as run,
             patch.dict(os.environ, {"USER": "root", "HOME": "/root"}, clear=False),
         ):
