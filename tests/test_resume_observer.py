@@ -55,6 +55,20 @@ class ResumeObserverTests(unittest.TestCase):
         self.assertEqual(row["result"], "FAIL")
         self.assertEqual(notify.call_args.kwargs["urgency"], "critical")
 
+    def test_notify_forces_utf8_locale_for_hebrew_text(self):
+        cfg = {"notification_user": "user", "notification_uid": 1000}
+        completed = type("Completed", (), {"returncode": 0})()
+        with (
+            patch.object(Path, "exists", return_value=True),
+            patch.object(observer.subprocess, "run", return_value=completed) as run,
+        ):
+            self.assertTrue(observer._notify(cfg, "כותרת", "תוכן"))
+        argv = run.call_args.args[0]
+        self.assertIn("LANG=C.UTF-8", argv)
+        self.assertIn("LC_ALL=C.UTF-8", argv)
+        self.assertIn("כותרת", argv)
+        self.assertIn("תוכן", argv)
+
     def test_logging_failure_is_best_effort(self):
         impossible = Path(self.tmp.name) / "not-a-directory"
         impossible.write_text("x")

@@ -94,6 +94,8 @@ def _notify(config: dict, title: str, body: str, urgency: str = "normal") -> boo
                 "/usr/bin/env",
                 f"XDG_RUNTIME_DIR=/run/user/{uid}",
                 f"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{uid}/bus",
+                "LANG=C.UTF-8",
+                "LC_ALL=C.UTF-8",
                 "/usr/bin/notify-send",
                 "-a", "AAG Power",
                 "-u", urgency,
