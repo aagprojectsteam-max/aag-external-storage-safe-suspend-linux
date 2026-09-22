@@ -25,11 +25,15 @@ class ResumeObserverTests(unittest.TestCase):
 
     def test_start_stage_success_create_one_structured_log(self):
         cfg = {"notification_user": "user", "notification_uid": 1000}
-        with patch.object(observer, "_notify", return_value=True):
+        with patch.object(observer, "_notify", return_value=True) as notify:
             marker = observer.start(cfg, "suspend", "episode", source="test")
+            self.assertEqual(notify.call_args.args[1], "AAG — Returning from Sleep")
+            self.assertIn("Restoring devices, services", notify.call_args.args[2])
             observer.stage("suspend", "episode", "STORAGE_RESTORE", "START")
             observer.stage("suspend", "episode", "STORAGE_RESTORE", "PASS")
             observer.success(cfg, "suspend", "episode", started_at=marker["started_at"])
+            self.assertEqual(notify.call_args.args[1], "AAG — Return from Sleep Complete")
+            self.assertIn("All resume checks passed", notify.call_args.args[2])
         rows = self.rows()
         self.assertEqual(
             [row["event"] for row in rows],
@@ -55,19 +59,19 @@ class ResumeObserverTests(unittest.TestCase):
         self.assertEqual(row["result"], "FAIL")
         self.assertEqual(notify.call_args.kwargs["urgency"], "critical")
 
-    def test_notify_forces_utf8_locale_for_hebrew_text(self):
+    def test_notify_forces_utf8_locale_for_unicode_text(self):
         cfg = {"notification_user": "user", "notification_uid": 1000}
         completed = type("Completed", (), {"returncode": 0})()
         with (
             patch.object(Path, "exists", return_value=True),
             patch.object(observer.subprocess, "run", return_value=completed) as run,
         ):
-            self.assertTrue(observer._notify(cfg, "כותרת", "תוכן"))
+            self.assertTrue(observer._notify(cfg, "AAG — Returning from Sleep", "Resume complete — verified"))
         argv = run.call_args.args[0]
         self.assertIn("LANG=C.UTF-8", argv)
         self.assertIn("LC_ALL=C.UTF-8", argv)
-        self.assertIn("כותרת", argv)
-        self.assertIn("תוכן", argv)
+        self.assertIn("AAG — Returning from Sleep", argv)
+        self.assertIn("Resume complete — verified", argv)
 
     def test_failed_items_name_only_real_unrestored_components(self):
         value = {
@@ -83,7 +87,7 @@ class ResumeObserverTests(unittest.TestCase):
         }
         self.assertEqual(
             observer.failed_items(value, "S4_RESTORE"),
-            ["AnythingLLM", "USB Clone: kingston", "מודם / WWAN"],
+            ["AnythingLLM", "USB Clone: kingston", "Modem / WWAN"],
         )
 
     def test_failure_notification_includes_failed_component_names(self):
@@ -94,9 +98,12 @@ class ResumeObserverTests(unittest.TestCase):
                 phase="S4_RESTORE", reason="timeout",
                 failed_items=["AnythingLLM", "USB Clone: kingston"],
             )
+        self.assertEqual(notify.call_args.args[1], "AAG — Return from Hibernate Failed")
         body = notify.call_args.args[2]
+        self.assertIn("Return from Hibernate failed during S4_RESTORE.", body)
         self.assertIn("AnythingLLM", body)
         self.assertIn("USB Clone: kingston", body)
+        self.assertIn("Details were saved to", body)
         row = self.rows("hibernate")[0]
         self.assertEqual(row["failed_items"], ["AnythingLLM", "USB Clone: kingston"])
 

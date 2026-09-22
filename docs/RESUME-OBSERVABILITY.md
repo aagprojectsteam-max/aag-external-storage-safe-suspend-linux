@@ -8,10 +8,12 @@ blocks or retries a power transition.
 
 After a confirmed resume and user-session thaw, AAG sends a desktop notification:
 
-- Suspend start: `AAG — שחזור המערכת ממצב שינה החל`
-- Hibernate start: `AAG — שחזור המערכת ממצב תרדמה החל`
-- Success: `AAG — השחזור ממצב שינה/תרדמה הושלם בהצלחה`
-- Failure: `AAG — בעיה בשחזור ממצב שינה/תרדמה`
+- Suspend start: `AAG — Returning from Sleep`
+- Hibernate start: `AAG — Returning from Hibernate`
+- Suspend success: `AAG — Return from Sleep Complete`
+- Hibernate success: `AAG — Return from Hibernate Complete`
+- Suspend failure: `AAG — Return from Sleep Failed`
+- Hibernate failure: `AAG — Return from Hibernate Failed`
 
 Notifications are best-effort. A missing desktop bus or notification failure must
 not alter the power transaction result.

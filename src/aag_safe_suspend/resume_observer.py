@@ -113,13 +113,13 @@ def _notify(config: dict, title: str, body: str, urgency: str = "normal") -> boo
 
 
 def _label(kind: str) -> str:
-    return "מצב תרדמה" if kind == "hibernate" else "מצב שינה"
+    return "Hibernate" if kind == "hibernate" else "Sleep"
 
 
 def start(config: dict, kind: str, episode, **detail) -> dict:
     label = _label(kind)
-    title = f"AAG — שחזור המערכת מ{label} החל"
-    body = "AAG משחזר כעת את רכיבי המערכת והשירותים. מומלץ להמתין להודעת הסיום."
+    title = f"AAG — Returning from {label}"
+    body = "Restoring devices, services, and saved runtime state. Please wait for completion."
     sent = _notify(config, title, body)
     path = _append(kind, episode, "RESUME_STARTED", notification_sent=sent, **detail)
     return {"started_at": time.time(), "log_path": str(path) if path else None}
@@ -137,10 +137,10 @@ def success(config: dict, kind: str, episode, *, started_at=None, **detail):
     except (TypeError, ValueError):
         duration = None
     label = _label(kind)
-    title = f"AAG — השחזור מ{label} הושלם בהצלחה"
-    body = "כל בדיקות השחזור הסתיימו בהצלחה. המערכת והשירותים חזרו לפעולה תקינה."
+    title = f"AAG — Return from {label} Complete"
+    body = "All resume checks passed. Devices and services are ready."
     if duration is not None:
-        body += f" זמן השחזור: {duration:.1f} שניות."
+        body += f" Resume time: {duration:.1f} seconds."
     sent = _notify(config, title, body)
     path = _append(
         kind,
@@ -181,13 +181,13 @@ def failed_items(value: dict, phase: str) -> list[str]:
 
     wwan = value.get("s4_wwan_receipt") or {}
     if phase in {"S4_RESTORE", "WWAN_RESTORE"} and wwan.get("status") != "RESTORED":
-        items.append("מודם / WWAN")
+        items.append("Modem / WWAN")
 
     phase_items = {
-        "RESTORE_STORAGE": "אחסון / DATA",
-        "DEVICE_POST": "שחזור התקני Suspend",
-        "DEVICE_POLICY_RESTORE": "מדיניות המודם",
-        "WAKE_WHILE_LID_CLOSED": "בדיקת מכסה",
+        "RESTORE_STORAGE": "Storage / DATA",
+        "DEVICE_POST": "Suspend device recovery",
+        "DEVICE_POLICY_RESTORE": "Modem policy",
+        "WAKE_WHILE_LID_CLOSED": "Lid check",
     }
     if phase in phase_items:
         items.append(phase_items[phase])
@@ -210,15 +210,15 @@ def failure(config: dict, kind: str, episode, *, phase: str, reason: str, starte
     except (TypeError, ValueError):
         duration = None
     label = _label(kind)
-    title = f"AAG — בעיה בשחזור מ{label}"
+    title = f"AAG — Return from {label} Failed"
     failed_items = list(failed_items or [])
-    body = f"תהליך השחזור לא הושלם בשלב {phase}."
+    body = f"Return from {label} failed during {phase}."
     if failed_items:
         visible = ", ".join(failed_items[:4])
         if len(failed_items) > 4:
-            visible += f" ועוד {len(failed_items) - 4}"
-        body += f" לא שוחזרו: {visible}."
-    body += f" פרטי התקלה נשמרו ב־{LOG_DIR}."
+            visible += f" and {len(failed_items) - 4} more"
+        body += f" Failed to restore: {visible}."
+    body += f" Details were saved to {LOG_DIR}."
     sent = _notify(config, title, body, urgency="critical")
     path = _append(
         kind,
