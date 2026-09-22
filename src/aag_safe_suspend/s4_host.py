@@ -128,17 +128,62 @@ class Host(p.Host):
         sample["modem_present"] = enumeration.returncode == 0 and "/Modem/" in enumeration.stdout
         return sample
 
-    def snapshot(self):
+    def snapshot(self, *, allow_lid_ignore=False):
         return {
             "data": checks.findmnt("/mnt/data"),
             "ugreen": self.audit_storage(),
             "network": self.network_sample(),
             "sessions": checks.sessions(),
-            "locklock": checks.locklock(),
+            "locklock": checks.locklock(allow_lid_ignore=allow_lid_ignore),
             "modem_policy": self.t.policy(),
             "boot": self.r.boot_id(),
             "created": time.time(),
         }
+
+    def native_request_active(self):
+        state = p.properties(NATIVE)
+        return state.get("Job") not in {"", "0"} or state.get("ActiveState") in {
+            "activating",
+            "active",
+        }
+
+    def production_snapshot(self):
+        if not self.native_request_active():
+            raise Refusal("production Hibernate requires an active native systemd request")
+        before = self.snapshot(allow_lid_ignore=True)
+        prepared = dict(before["network"])
+        if not prepared.get("healthy") or not prepared.get("connection_uuid"):
+            cfg = self.t.config()
+            profile = cfg.get("tested_cellular_profile")
+            if not profile or profile == "--":
+                raise Refusal("production Hibernate has no qualified cellular profile")
+            radio = p.run(
+                ["/usr/bin/nmcli", "-t", "-f", "WWAN", "radio"], timeout=4
+            ).stdout.strip()
+            auto = p.run(
+                [
+                    "/usr/bin/nmcli",
+                    "-g",
+                    "connection.autoconnect",
+                    "connection",
+                    "show",
+                    profile,
+                ],
+                timeout=4,
+            ).stdout.strip()
+            expected = radio == "enabled" and auto == "yes"
+            network = dict(prepared)
+            network.update(
+                healthy=expected,
+                connection_uuid=profile,
+                basis="WWAN radio enabled and existing profile autoconnect=yes",
+                radio=radio,
+                autoconnect=auto,
+                prepared_snapshot=prepared,
+            )
+            before["network"] = network
+        before["request_mode"] = "native-production"
+        return before
 
     def permit(self):
         p.trusted(PERMIT)
@@ -147,10 +192,13 @@ class Host(p.Host):
             permit.get("boot_id") != self.r.boot_id()
             or permit.get("expires", 0) < time.time()
             or permit.get("consumed")
-            or permit.get("go") != "PASS"
+        ):
+            raise Refusal("stale S4 qualification permit")
+        if (
+            permit.get("go") != "PASS"
             or permit.get("config_sha256") != hashlib.sha256(checks.CONFIG.read_bytes()).hexdigest()
         ):
-            raise Refusal("no fresh unconsumed S4 qualification permit")
+            raise Refusal("invalid S4 qualification permit")
         permit["consumed"] = True
         self.persist(PERMIT, permit)
         return permit
@@ -167,21 +215,46 @@ class Host(p.Host):
                 raise Refusal("active S4 transaction owns preparation")
             p.run(["/usr/bin/systemctl", "--no-block", "start", FINISH], timeout=5)
             raise Refusal("prior S4 recovery queued to its sole owner")
-        permit = self.permit()
-        self.before = self.snapshot()
-        original = permit.get("before_dispatch")
-        if not original or not original.get("sessions"):
-            raise Refusal("S4 permit lacks the pre-logind session/network snapshot")
-        # logind PrepareForSleep can quiesce NM before V2 begins. That must not
-        # erase the original connected-profile restoration obligation.
-        self.before.update(
-            network=original["network"],
-            sessions=original["sessions"],
-            modem_policy=original["modem_policy"],
-        )
-        self.before["permit"] = permit
-        if self.before["locklock"]["result"] != "PASS" or self.r.lid_state() != "open":
-            raise Refusal("explicit Hibernate requires open lid and LockLock OFF")
+        explicit = True
+        try:
+            permit = self.permit()
+        except FileNotFoundError:
+            explicit = False
+            permit = None
+        except Refusal as exc:
+            if str(exc) != "stale S4 qualification permit":
+                raise
+            explicit = False
+            permit = None
+
+        if explicit:
+            self.before = self.snapshot()
+            original = permit.get("before_dispatch")
+            if not original or not original.get("sessions"):
+                raise Refusal("S4 permit lacks the pre-logind session/network snapshot")
+            # logind PrepareForSleep can quiesce NM before V2 begins. Preserve
+            # the pre-dispatch identity for an explicitly qualified cycle.
+            self.before.update(
+                network=original["network"],
+                sessions=original["sessions"],
+                modem_policy=original["modem_policy"],
+            )
+            self.before["request_mode"] = "qualified-explicit"
+            self.before["permit"] = permit
+        else:
+            # GUI, UPower and direct logind/systemctl requests arrive here only
+            # after logind has started the native Hibernate transaction.
+            self.before = self.production_snapshot()
+            self.before["permit"] = {
+                "source": "native-systemd",
+                "consumed": True,
+                "boot_id": self.r.boot_id(),
+            }
+
+        if self.before["locklock"]["result"] != "PASS":
+            raise Refusal("LockLock state does not permit Hibernate")
+        if explicit and self.r.lid_state() != "open":
+            raise Refusal("explicit Hibernate qualification requires the lid open")
         # Host.begin calls the unchanged accepted workload/clone/process code.
         try:
             super().begin()
@@ -224,7 +297,14 @@ class Host(p.Host):
         self.update(native_invocation=invocation)
         try:
             self.quiesce_clones()
-            result = checks.readiness(self, self.s4_cfg, before_image=True)
+            result = checks.readiness(
+                self,
+                self.s4_cfg,
+                before_image=True,
+                allow_lid_ignore=(
+                    self.value.get("s4_before", {}).get("request_mode") == "native-production"
+                ),
+            )
             self.update(s4_gate=result)
             if result["result"] != "PASS":
                 raise Refusal(

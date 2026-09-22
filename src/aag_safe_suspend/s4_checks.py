@@ -178,18 +178,28 @@ def modem_generation(cfg):
         return {"hardware_ok": False, "generation": None}
 
 
-def locklock():
+def locklock(*, allow_lid_ignore=False):
     result = json.loads(p.run(["/usr/bin/input-lock", "status", "--json"]).stdout)
-    # State may have many device details, but no input changes are made here.
+    # Physical qualification keeps the original strict open-lid/OFF contract.
+    # Production-native Hibernate may run while lid-ignore is armed: that
+    # inhibitor is scoped to handle-lid-switch and is not a general sleep block.
+    if allow_lid_ignore:
+        lid_policy_ok = (
+            result.get("lid_inhibitor_active") is True
+            if result.get("ignore_lid_close") is True
+            else result.get("lid_inhibitor_active") is False
+        )
+    else:
+        lid_policy_ok = (
+            result.get("ignore_lid_close") is False
+            and result.get("lid_is_closed") is False
+            and result.get("lid_inhibitor_active") is False
+        )
     return {
         "result": "PASS"
         if result.get("daemon") == "running"
-        # GNOME locks the screen on PrepareForSleep. LockLock intentionally
-        # drops eligibility on LockedHint; this is a safe OFF state, not a veto.
-        and result.get("ignore_lid_close") is False
-        and result.get("lid_is_closed") is False
+        and lid_policy_ok
         and result.get("sleep_inhibitor_active") is False
-        and result.get("lid_inhibitor_active") is False
         and not result.get("grabbed_devices")
         and not result.get("incomplete_devices")
         and not result.get("release_errors")
@@ -198,7 +208,7 @@ def locklock():
     }
 
 
-def readiness(host, cfg, *, before_image=False):
+def readiness(host, cfg, *, before_image=False, allow_lid_ignore=False):
     kernel = os.uname().release
     result = {
         "MEMORY_GATE": memory(cfg["swap_file"]),
@@ -250,7 +260,7 @@ def readiness(host, cfg, *, before_image=False):
         "audit": audit,
     }
     result["FM350_T700_GATE"] = "PASS" if modem_generation(cfg)["hardware_ok"] else "FAIL"
-    result["LOCKLOCK_GATE"] = locklock()
+    result["LOCKLOCK_GATE"] = locklock(allow_lid_ignore=allow_lid_ignore)
     result["WWAN_SINGLE_OWNER"] = host.owner_graph()
     result["CONSUMER_RESTORE_GATE"] = (
         "PASS" if cfg.get("simulated_gates", {}).get("CONSUMER_RESTORE") == "PASS" else "FAIL"

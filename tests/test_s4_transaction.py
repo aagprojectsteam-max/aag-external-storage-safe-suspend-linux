@@ -401,6 +401,45 @@ class HostLifecycleTests(unittest.TestCase):
         self.assertTrue(self.state["s4_before"]["network"]["healthy"])
         self.assertEqual(self.state["s4_before"]["network"]["connection_uuid"], "profile")
 
+    def test_native_production_hibernate_does_not_require_test_permit(self):
+        self.host.permit.side_effect = FileNotFoundError
+        before = copy.deepcopy(self.before)
+        before["request_mode"] = "native-production"
+        self.host.production_snapshot = Mock(return_value=before)
+        self.host.begin()
+        self.assertEqual(self.state["transaction_type"], s4.TYPE)
+        self.assertEqual(self.state["s4_before"]["request_mode"], "native-production")
+        self.assertEqual(self.state["s4_before"]["permit"]["source"], "native-systemd")
+        self.host.production_snapshot.assert_called_once_with()
+
+    def test_invalid_unconsumed_test_permit_is_not_bypassed(self):
+        self.host.permit.side_effect = tx.Refusal("invalid S4 qualification permit")
+        self.host.production_snapshot = Mock()
+        with self.assertRaisesRegex(tx.Refusal, "invalid S4 qualification permit"):
+            self.host.begin()
+        self.host.production_snapshot.assert_not_called()
+
+    def test_native_production_snapshot_reuses_autoconnect_profile_after_NM_quiesce(self):
+        self.host.native_request_active = Mock(return_value=True)
+        prepared = copy.deepcopy(self.before)
+        prepared["network"] = {"healthy": False, "hardware_ok": True, "generation": "g"}
+        self.host.snapshot = Mock(return_value=prepared)
+        self.host.t.config = Mock(return_value={"tested_cellular_profile": "profile"})
+
+        def command(argv, **kwargs):
+            if argv[:5] == ["/usr/bin/nmcli", "-t", "-f", "WWAN", "radio"]:
+                return SimpleNamespace(stdout="enabled\n", stderr="", returncode=0)
+            if argv[:4] == ["/usr/bin/nmcli", "-g", "connection.autoconnect", "connection"]:
+                return SimpleNamespace(stdout="yes\n", stderr="", returncode=0)
+            return SimpleNamespace(stdout="", stderr="", returncode=0)
+
+        self.run.side_effect = command
+        result = self.host.production_snapshot()
+        self.assertEqual(result["request_mode"], "native-production")
+        self.assertTrue(result["network"]["healthy"])
+        self.assertEqual(result["network"]["connection_uuid"], "profile")
+        self.assertEqual(result["network"]["prepared_snapshot"]["healthy"], False)
+
     def test_reconciling_an_old_suspend_does_not_relabel_it_as_Hibernate(self):
         self.host.before = self.before
         self.host.value = tx.new("boot", "old-suspend-invocation")
