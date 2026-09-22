@@ -49,8 +49,11 @@ class ResumeObserverTests(unittest.TestCase):
         cfg = {}
         with patch.object(observer, "_notify", return_value=False) as notify:
             observer.failure(
-                cfg, "hibernate", "episode",
-                phase="WWAN_RESTORE", reason="timeout",
+                cfg,
+                "hibernate",
+                "episode",
+                phase="WWAN_RESTORE",
+                reason="timeout",
             )
         row = self.rows("hibernate")[0]
         self.assertEqual(row["event"], "RESUME_FAILED")
@@ -66,7 +69,9 @@ class ResumeObserverTests(unittest.TestCase):
             patch.object(Path, "exists", return_value=True),
             patch.object(observer.subprocess, "run", return_value=completed) as run,
         ):
-            self.assertTrue(observer._notify(cfg, "AAG — Returning from Sleep", "Resume complete — verified"))
+            self.assertTrue(
+                observer._notify(cfg, "AAG — Returning from Sleep", "Resume complete — verified")
+            )
         argv = run.call_args.args[0]
         self.assertIn("LANG=C.UTF-8", argv)
         self.assertIn("LC_ALL=C.UTF-8", argv)
@@ -76,12 +81,32 @@ class ResumeObserverTests(unittest.TestCase):
     def test_failed_items_name_only_real_unrestored_components(self):
         value = {
             "stopped_workloads": [
-                {"name": "AnythingLLM", "was_running": True, "restart_after_resume": "if_was_running", "status": "RESTORE_REQUESTED"},
-                {"name": "Never", "was_running": True, "restart_after_resume": "never", "status": "LEFT_STOPPED_BY_POLICY"},
-                {"name": "Healthy", "was_running": True, "restart_after_resume": "if_was_running", "status": "RESTORED"},
+                {
+                    "name": "AnythingLLM",
+                    "was_running": True,
+                    "restart_after_resume": "if_was_running",
+                    "status": "RESTORE_REQUESTED",
+                },
+                {
+                    "name": "Never",
+                    "was_running": True,
+                    "restart_after_resume": "never",
+                    "status": "LEFT_STOPPED_BY_POLICY",
+                },
+                {
+                    "name": "Healthy",
+                    "was_running": True,
+                    "restart_after_resume": "if_was_running",
+                    "status": "RESTORED",
+                },
             ],
             "usbclone_stopped": [
-                {"name": "usbclone_kingston", "was_running": True, "restart_after_resume": "if_was_running", "status": "RESTORE_FAILED"},
+                {
+                    "name": "usbclone_kingston",
+                    "was_running": True,
+                    "restart_after_resume": "if_was_running",
+                    "status": "RESTORE_FAILED",
+                },
             ],
             "s4_wwan_receipt": {"status": "RESTORE_FAILED"},
         }
@@ -94,8 +119,11 @@ class ResumeObserverTests(unittest.TestCase):
         cfg = {}
         with patch.object(observer, "_notify", return_value=True) as notify:
             observer.failure(
-                cfg, "hibernate", "episode",
-                phase="S4_RESTORE", reason="timeout",
+                cfg,
+                "hibernate",
+                "episode",
+                phase="S4_RESTORE",
+                reason="timeout",
                 failed_items=["AnythingLLM", "USB Clone: kingston"],
             )
         self.assertEqual(notify.call_args.args[1], "AAG — Return from Hibernate Failed")

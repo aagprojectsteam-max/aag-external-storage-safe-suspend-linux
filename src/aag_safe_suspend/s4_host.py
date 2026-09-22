@@ -158,9 +158,7 @@ class Host(p.Host):
             profile = cfg.get("tested_cellular_profile")
             if not profile or profile == "--":
                 raise Refusal("production Hibernate has no qualified cellular profile")
-            radio = p.run(
-                ["/usr/bin/nmcli", "-t", "-f", "WWAN", "radio"], timeout=4
-            ).stdout.strip()
+            radio = p.run(["/usr/bin/nmcli", "-t", "-f", "WWAN", "radio"], timeout=4).stdout.strip()
             auto = p.run(
                 [
                     "/usr/bin/nmcli",
@@ -531,7 +529,9 @@ class Host(p.Host):
         self.emit("S4_TERMINAL", outcome=outcome)
         if outcome == "COMPLETE" and self.value.get("image_resume_confirmed"):
             observer.success(
-                self.cfg, "hibernate", self.value.get("episode"),
+                self.cfg,
+                "hibernate",
+                self.value.get("episode"),
                 started_at=self.value.get("resume_observer_started_at"),
                 terminal=outcome,
             )
@@ -555,7 +555,9 @@ class Host(p.Host):
                 if self.confirm_image():
                     outcome = "COMPLETE"
                     marker = observer.start(
-                        self.cfg, "hibernate", self.value.get("episode"),
+                        self.cfg,
+                        "hibernate",
+                        self.value.get("episode"),
                         request_mode=self.value.get("s4_before", {}).get("request_mode"),
                     )
                     changes = {

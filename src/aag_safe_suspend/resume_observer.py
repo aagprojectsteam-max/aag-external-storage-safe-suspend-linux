@@ -4,6 +4,7 @@ This module must never become a power-state owner.  All logging and desktop
 notifications are advisory: failures here are swallowed so they cannot turn a
 healthy Suspend/Hibernate restoration into a failed power transaction.
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -25,6 +26,7 @@ def _safe_episode(value) -> str:
     if re.fullmatch(r"[A-Za-z0-9_.-]+", text):
         return text
     import hashlib
+
     return hashlib.sha256(text.encode()).hexdigest()
 
 
@@ -90,15 +92,20 @@ def _notify(config: dict, title: str, body: str, urgency: str = "normal") -> boo
     try:
         result = subprocess.run(
             [
-                "/usr/sbin/runuser", "-u", str(user), "--",
+                "/usr/sbin/runuser",
+                "-u",
+                str(user),
+                "--",
                 "/usr/bin/env",
                 f"XDG_RUNTIME_DIR=/run/user/{uid}",
                 f"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{uid}/bus",
                 "LANG=C.UTF-8",
                 "LC_ALL=C.UTF-8",
                 "/usr/bin/notify-send",
-                "-a", "AAG Power",
-                "-u", urgency,
+                "-a",
+                "AAG Power",
+                "-u",
+                urgency,
                 title,
                 body,
             ],
@@ -202,7 +209,17 @@ def failed_items(value: dict, phase: str) -> list[str]:
     return result
 
 
-def failure(config: dict, kind: str, episode, *, phase: str, reason: str, started_at=None, failed_items=None, **detail):
+def failure(
+    config: dict,
+    kind: str,
+    episode,
+    *,
+    phase: str,
+    reason: str,
+    started_at=None,
+    failed_items=None,
+    **detail,
+):
     duration = None
     try:
         if started_at is not None:
@@ -239,10 +256,7 @@ def failure(config: dict, kind: str, episode, *, phase: str, reason: str, starte
 def prune() -> None:
     try:
         ensure_log_dir()
-        files = [
-            p for p in LOG_DIR.glob("*.jsonl")
-            if not p.is_symlink() and p.is_file()
-        ]
+        files = [p for p in LOG_DIR.glob("*.jsonl") if not p.is_symlink() and p.is_file()]
         files.sort(key=lambda p: p.stat().st_mtime_ns, reverse=True)
         for path in files[KEEP_LOGS:]:
             path.unlink()
