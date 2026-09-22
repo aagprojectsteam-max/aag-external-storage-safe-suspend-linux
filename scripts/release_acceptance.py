@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 
 import deploy_hibernate
+import deploy_transaction
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = "1.4.1"
@@ -441,7 +442,8 @@ def main() -> int:
             str(Path(temporary) / "reference-report"),
         ]
         reference = json.loads(run(reference_common + ["--config", str(synthetic_config)]).stdout)
-        if reference["status"] != "INSTALLED" or reference["files"] != 15:
+        expected_reference_files = len(deploy_transaction.mapping(synthetic_config)) + 1
+        if reference["status"] != "INSTALLED" or reference["files"] != expected_reference_files:
             raise RuntimeError("packaged transaction mapping was incomplete")
         runtime = (
             reference_root / "usr/local/lib/aag-sleep-transaction/aag_safe_suspend/production.py"
