@@ -1,5 +1,5 @@
 {
-  "accepted_implementation_commit": "b0ebbb7e4a408dafe55652b0514c300f2a039c46",
+  "accepted_implementation_commit": "9eb1760",
   "physical_s4_acceptance": "PASS",
   "mobile_connectivity_after_s4": "PASS",
   "manual_reboot_required": false,
@@ -8,8 +8,8 @@
     "src/aag-power-transaction": "6975b6a408029cba62077dd8df481d9d24fde7f1bcc7a7f682d19737dbd5da53",
     "src/aag_safe_suspend/power_dispatch.py": "a8485b8a8415589841d4033fbe56d19e14ecfa6c574bd12c00a07a5781465fb0",
     "src/aag_safe_suspend/s4_transaction.py": "78dc9bd1999542c15c82b7a5b2a793646e7adbd70dc247b54861ba884f3ceeb6",
-    "src/aag_safe_suspend/s4_checks.py": "89773276b524e42dcfd9fafbf2fe7a38aff0948153f5a43f9f594cbde7fa5c9a",
-    "src/aag_safe_suspend/s4_host.py": "f3dafd37ba960dd091a0749b10558cb3f3e14859d4211531d32ad811d1731f4e",
+    "src/aag_safe_suspend/s4_checks.py": "ec811215afb48a17f0263968f0d48b50f470ed605d6d036e2d16e058179bdd95",
+    "src/aag_safe_suspend/s4_host.py": "ed64ae7122faf24fcf374c8652f6809aa10e93a24ede5842af51d3850b833131",
     "systemd/hibernate/zz-storage.conf": "2a7bc044d27e9bf562b97be5b3c06a220b86dd140a3d37cb8c7399e85da77db8",
     "systemd/hibernate/zz-failure.conf": "e0ed598030b2e9954cbb2451a27062b38b0dd231d6b609216796f32473588bb4",
     "systemd/hibernate/zz-boot.conf": "4ea4c9302b48e2ad3be54515798e643f76b7574a2d17115468ae5d69bd4e07f3",
@@ -22,5 +22,5 @@
     "systemd/hibernate/retired-wwan-helper": "e06bfa609ecda91a19797698d8b53587f5bff9348f789266c84c1c39aa010406",
     "scripts/deploy_hibernate.py": "1d9f50f64f253cbd8f9592024e8bd5e6af224235d5912fd554f171bdfec1111b"
   },
-  "qualification_note": "v1.4.1 post-firmware S4 requalification: same-boot image resume, COMPLETE transaction, both saved USB Clone profiles restored, and cellular service recovered."
+  "qualification_note": "Resume observability continuation on the native S4 entry: restoration stage logs and best-effort notifications only. The sole S4 recovery owner and kernel Hibernate executor are unchanged; the accepted 2026-09-21 physical S4 baseline remains preserved."
 }
