@@ -1,5 +1,5 @@
 {
-  "accepted_implementation_commit": "a85b710f80fcc562ae246c499441e52676a97adb",
+  "accepted_implementation_commit": "10f45e748bf7f9f114e37bd51a1f120a534703dd",
   "physical_s4_acceptance": "PASS",
   "mobile_connectivity_after_s4": "PASS",
   "manual_reboot_required": false,
@@ -9,7 +9,7 @@
     "src/aag_safe_suspend/power_dispatch.py": "a8485b8a8415589841d4033fbe56d19e14ecfa6c574bd12c00a07a5781465fb0",
     "src/aag_safe_suspend/s4_transaction.py": "78dc9bd1999542c15c82b7a5b2a793646e7adbd70dc247b54861ba884f3ceeb6",
     "src/aag_safe_suspend/s4_checks.py": "ec811215afb48a17f0263968f0d48b50f470ed605d6d036e2d16e058179bdd95",
-    "src/aag_safe_suspend/s4_host.py": "c1a3a8ec31cf1e89c78109f64259c89729455a47afc2cec15999a3cd6092b7ba",
+    "src/aag_safe_suspend/s4_host.py": "77ab842e4bf12954fe1cb17e71127ef85aa457d0a32f7b4f5b544ccd2ad25201",
     "systemd/hibernate/zz-storage.conf": "2a7bc044d27e9bf562b97be5b3c06a220b86dd140a3d37cb8c7399e85da77db8",
     "systemd/hibernate/zz-failure.conf": "e0ed598030b2e9954cbb2451a27062b38b0dd231d6b609216796f32473588bb4",
     "systemd/hibernate/zz-boot.conf": "4ea4c9302b48e2ad3be54515798e643f76b7574a2d17115468ae5d69bd4e07f3",
@@ -21,7 +21,7 @@
     "systemd/hibernate/99-aag-wwan-hibernate": "0b120f8882dbc1653b020718620ae514233729698da6e242f115d11986155626",
     "systemd/hibernate/retired-wwan-helper": "e06bfa609ecda91a19797698d8b53587f5bff9348f789266c84c1c39aa010406",
     "scripts/deploy_hibernate.py": "1d9f50f64f253cbd8f9592024e8bd5e6af224235d5912fd554f171bdfec1111b",
-    "src/aag_safe_suspend/resume_observer.py": "843104766d45e069fa634bf53f62c7a849e2b3b6560bfc08d45aa62b6ac1453b"
+    "src/aag_safe_suspend/resume_observer.py": "43533a3819a3d9d05c342b6ef3bdfe337b2aaeeab3f440de431c0ff69d223540"
   },
-  "qualification_note": "Resume observability continuation on the native S4 entry: restoration stage logs and best-effort notifications only. The sole S4 recovery owner and kernel Hibernate executor are unchanged; the accepted 2026-09-21 physical S4 baseline remains preserved; UTF-8 notification transport is explicitly pinned and regression-tested; failed restore components are named only from durable receipts and remain observability-only. User-facing resume notifications are English-only and use direct Return/Returning wording. CI style-only import ordering correction; runtime behavior is unchanged."
+  "qualification_note": "Resume observability continuation on the native S4 entry: restoration stage logs and best-effort notifications only. The sole S4 recovery owner and kernel Hibernate executor are unchanged; the accepted 2026-09-21 physical S4 baseline remains preserved; UTF-8 notification transport is explicitly pinned and regression-tested; failed restore components are named only from durable receipts and remain observability-only. User-facing resume notifications are English-only and use direct Return/Returning wording. CI style-only import ordering correction; runtime behavior is unchanged. Ruff 0.16.6 formatting applied; behavior is unchanged."
 }
