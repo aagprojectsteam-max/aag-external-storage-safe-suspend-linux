@@ -1,5 +1,5 @@
 {
-  "accepted_implementation_commit": "9eb1760",
+  "accepted_implementation_commit": "2745ac6ca4b6d0f208df23e7249627624eef5ccc",
   "physical_s4_acceptance": "PASS",
   "mobile_connectivity_after_s4": "PASS",
   "manual_reboot_required": false,
@@ -20,7 +20,8 @@
     "systemd/hibernate/retired-qualifier": "169e6d1345d0bea3fd1187c7e153f5bb57236957005bf6014e42e7d26ac33d78",
     "systemd/hibernate/99-aag-wwan-hibernate": "0b120f8882dbc1653b020718620ae514233729698da6e242f115d11986155626",
     "systemd/hibernate/retired-wwan-helper": "e06bfa609ecda91a19797698d8b53587f5bff9348f789266c84c1c39aa010406",
-    "scripts/deploy_hibernate.py": "1d9f50f64f253cbd8f9592024e8bd5e6af224235d5912fd554f171bdfec1111b"
+    "scripts/deploy_hibernate.py": "1d9f50f64f253cbd8f9592024e8bd5e6af224235d5912fd554f171bdfec1111b",
+    "src/aag_safe_suspend/resume_observer.py": "570857c3e5d0dfe7faca50f2a4e2cb5068c075cc325fc5d98c07b4dfd4ca1257"
   },
-  "qualification_note": "Resume observability continuation on the native S4 entry: restoration stage logs and best-effort notifications only. The sole S4 recovery owner and kernel Hibernate executor are unchanged; the accepted 2026-09-21 physical S4 baseline remains preserved."
+  "qualification_note": "Resume observability continuation on the native S4 entry: restoration stage logs and best-effort notifications only. The sole S4 recovery owner and kernel Hibernate executor are unchanged; the accepted 2026-09-21 physical S4 baseline remains preserved; UTF-8 notification transport is explicitly pinned and regression-tested."
 }
