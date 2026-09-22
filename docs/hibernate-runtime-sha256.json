@@ -1,5 +1,5 @@
 {
-  "accepted_implementation_commit": "e867c4c71c5c5aea9ef66860ed61417c9bf1bd3a",
+  "accepted_implementation_commit": "ef10f68",
   "physical_s4_acceptance": "PASS",
   "mobile_connectivity_after_s4": "PASS",
   "manual_reboot_required": false,
@@ -21,7 +21,7 @@
     "systemd/hibernate/99-aag-wwan-hibernate": "0b120f8882dbc1653b020718620ae514233729698da6e242f115d11986155626",
     "systemd/hibernate/retired-wwan-helper": "e06bfa609ecda91a19797698d8b53587f5bff9348f789266c84c1c39aa010406",
     "scripts/deploy_hibernate.py": "1d9f50f64f253cbd8f9592024e8bd5e6af224235d5912fd554f171bdfec1111b",
-    "src/aag_safe_suspend/resume_observer.py": "83688cb08ca9f7e46e77b0bdfbcb5325337f77d303234dccd38401f88db257c8"
+    "src/aag_safe_suspend/resume_observer.py": "843104766d45e069fa634bf53f62c7a849e2b3b6560bfc08d45aa62b6ac1453b"
   },
-  "qualification_note": "Resume observability continuation on the native S4 entry: restoration stage logs and best-effort notifications only. The sole S4 recovery owner and kernel Hibernate executor are unchanged; the accepted 2026-09-21 physical S4 baseline remains preserved; UTF-8 notification transport is explicitly pinned and regression-tested; failed restore components are named only from durable receipts and remain observability-only."
+  "qualification_note": "Resume observability continuation on the native S4 entry: restoration stage logs and best-effort notifications only. The sole S4 recovery owner and kernel Hibernate executor are unchanged; the accepted 2026-09-21 physical S4 baseline remains preserved; UTF-8 notification transport is explicitly pinned and regression-tested; failed restore components are named only from durable receipts and remain observability-only. User-facing resume notifications are English-only and use direct Return/Returning wording."
 }
