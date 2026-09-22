@@ -12,6 +12,7 @@ from . import production as p
 from . import s4_checks as checks
 from . import s4_transaction as s4
 from . import transaction as tx
+from . import resume_observer as observer
 from .transaction import Refusal
 
 NATIVE = "systemd-hibernate.service"
@@ -528,6 +529,12 @@ class Host(p.Host):
             self.r.clear_to_idle(self.value, completed["state"])
             self.persist(p.STATE / "current.json", self.r.load_state())
         self.emit("S4_TERMINAL", outcome=outcome)
+        if outcome == "COMPLETE" and self.value.get("image_resume_confirmed"):
+            observer.success(
+                self.cfg, "hibernate", self.value.get("episode"),
+                started_at=self.value.get("resume_observer_started_at"),
+                terminal=outcome,
+            )
 
     def finish(self, cold=False):
         if not cold:
@@ -547,6 +554,15 @@ class Host(p.Host):
             elif not outcome:
                 if self.confirm_image():
                     outcome = "COMPLETE"
+                    marker = observer.start(
+                        self.cfg, "hibernate", self.value.get("episode"),
+                        request_mode=self.value.get("s4_before", {}).get("request_mode"),
+                    )
+                    changes = {
+                        "resume_observer_started_at": marker.get("started_at"),
+                        "resume_log_path": marker.get("log_path"),
+                    }
+                    self.update(**{k: v for k, v in changes.items() if v is not None})
                 elif self.value.get("s4_phase") == "PREP_FAILED":
                     outcome = "PREP_FAILED"
                 elif self.value.get("s4_phase") == "IMAGE_WRITE_REQUESTED":
@@ -559,13 +575,28 @@ class Host(p.Host):
                 )
                 self.update(s4_failure_outcome=outcome)
             self.phase("RESTORING", target_outcome=outcome)
+            log_resume = bool(outcome == "COMPLETE" and not cold)
+            if log_resume:
+                observer.stage("hibernate", self.value.get("episode"), "STORAGE_RESTORE", "START")
             self.restore_storage(cold)
+            if log_resume:
+                observer.stage("hibernate", self.value.get("episode"), "STORAGE_RESTORE", "PASS")
             # USB Clone is prepared by the shared Host path and carries its own
             # durable was_running/if_was_running receipt. Restore it only after
             # DATA/storage identity is healthy, for both image resume and abort.
+            if log_resume:
+                observer.stage("hibernate", self.value.get("episode"), "USBCLONE_RESTORE", "START")
             self.restore_clones()
+            if log_resume:
+                observer.stage("hibernate", self.value.get("episode"), "USBCLONE_RESTORE", "PASS")
+                observer.stage("hibernate", self.value.get("episode"), "WWAN_RESTORE", "START")
             self.restore_network(outcome == "COMPLETE", cold)
+            if log_resume:
+                observer.stage("hibernate", self.value.get("episode"), "WWAN_RESTORE", "PASS")
+                observer.stage("hibernate", self.value.get("episode"), "CONSUMERS_RESTORE", "START")
             self.restore_consumers()
+            if log_resume:
+                observer.stage("hibernate", self.value.get("episode"), "CONSUMERS_RESTORE", "PASS")
             if not cold and self.t.policy() != self.value["s4_before"]["modem_policy"]:
                 raise Refusal("S4 modem power policy unexpectedly changed")
             # /run and kernel inhibitor FDs are fresh on cold boot. Desktop

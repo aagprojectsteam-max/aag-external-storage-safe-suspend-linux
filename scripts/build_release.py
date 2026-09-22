@@ -227,6 +227,7 @@ def validate_only() -> dict[str, object]:
         Path("scripts/deploy_transaction.py"),
         Path("src/aag-sleep-transaction"),
         Path("src/aag_safe_suspend/production.py"),
+        Path("src/aag_safe_suspend/resume_observer.py"),
         Path("docs/transaction-runtime-sha256.json"),
         Path("docs/hibernate-runtime-sha256.json"),
         Path("scripts/deploy_hibernate.py"),

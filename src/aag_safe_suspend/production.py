@@ -23,6 +23,7 @@ from pathlib import Path
 
 from . import transaction as rules
 from . import workloads
+from . import resume_observer as observer
 
 CONFIG = Path("/etc/aag-sleep-transaction/config.json")
 STATE = Path("/var/lib/aag-sleep-transaction")
@@ -204,6 +205,9 @@ class Host:
             self.save()
 
     def failed(self, stage, reason, blockers=None):
+        notify_resume = False
+        resume_kind = "suspend"
+        started_at = None
         with self.r.state_lock():
             live = self.r.load_state()
             if self.value and live.get("episode") != self.value.get("episode"):
@@ -211,10 +215,20 @@ class Host:
                 return
             if live.get("state") == "IDLE":
                 return
+            notify_resume = bool(live.get("kernel_cycle") and not live.get("resume_failure_notified"))
+            resume_kind = "hibernate" if live.get("transaction_type") == "HIBERNATE" else "suspend"
+            started_at = live.get("resume_observer_started_at")
             self.value = rules.fail(live, stage, reason, blockers)
+            if notify_resume:
+                self.value["resume_failure_notified"] = True
             self.save()
         self.emit("SUSPEND_TXN_FAILED", stage=stage, reason=reason,
                   retry=self.value.get("retry_count", 0), fallback="diagnose-and-monitor")
+        if notify_resume:
+            observer.failure(
+                self.cfg, resume_kind, self.value.get("episode"),
+                phase=stage, reason=reason, started_at=started_at,
+            )
 
     def archive(self, terminal):
         self.r.validate_automount_marker_for_release(self.value)
@@ -424,9 +438,21 @@ class Host:
             raise rules.Refusal("kernel suspend never completed; recovery required")
         self.emit("KERNEL_SLEEP_OBSERVED", **evidence)
         self.update(state="SLEEP_COMMITTED", stage="RESUME_DETECTED", storage_state="RESUME_WAIT_DEVICE")
+        marker = observer.start(
+            self.cfg, "suspend", self.value.get("episode"),
+            sleep_class=evidence.get("sleep_class"),
+            suspended_seconds=evidence.get("suspended_seconds"),
+        )
+        changes = {
+            "resume_observer_started_at": marker.get("started_at"),
+            "resume_log_path": marker.get("log_path"),
+        }
+        self.update(**{k: v for k, v in changes.items() if v is not None})
+        observer.stage("suspend", self.value.get("episode"), "DEVICE_POLICY_RESTORE", "START")
         self.t.LIMIT = time.monotonic() + 25
         try:
             self.device_post()
+            observer.stage("suspend", self.value.get("episode"), "DEVICE_POLICY_RESTORE", "PASS")
         except Exception as e:
             self.failed('DEVICE_POST', str(e))
             raise
@@ -491,6 +517,8 @@ class Host:
         self.t.publish_result(out, result)
         self.t.QUEUE.rename(out / 'resume-check-completed.json')
         self.update(device_health=healthy, device_result=result)
+        if healthy:
+            observer.stage("suspend", self.value.get("episode"), "DEVICE_VERIFY", "PASS")
         if not healthy:
             self.t.block('Device health verification failed', str(out))
             raise rules.Refusal('failed device checks: ' + ','.join(k for k,v in result['checks'].items()
@@ -534,6 +562,7 @@ class Host:
         with self.r.state_lock():
             self.value = self.r.load_state()
         self.update(verify_invocation=os.environ.get("INVOCATION_ID"), stage="RESTORE_STORAGE")
+        observer.stage("suspend", self.value.get("episode"), "DEVICE_VERIFY", "START")
 
     def resume_terminal(self):
         with self.r.state_lock():
@@ -544,19 +573,32 @@ class Host:
         if os.environ.get("SERVICE_RESULT") != "success":
             self.failed("RESTORE_STORAGE", "device health verification failed", self.value.get('blockers'))
             raise rules.Refusal("device health verification failed")
+        observer.stage("suspend", self.value.get("episode"), "STORAGE_RESTORE", "START")
         terminal = self.r.terminal_ugreen_reaudit(self.value)
         if not terminal.get("ok"):
             self.failed("RESTORE_STORAGE", terminal.get("reason", "unknown"))
             raise rules.Refusal("external storage terminal verification failed")
+        observer.stage("suspend", self.value.get("episode"), "STORAGE_RESTORE", "PASS")
         self.update(stage="RESTORE_WORKLOADS", storage_state="HEALTHY", terminal_ugreen_reaudit=terminal)
+        observer.stage("suspend", self.value.get("episode"), "WORKLOADS_RESTORE", "START")
         workloads.restore(self.cfg["workloads"], self.value.get("stopped_workloads", []),
                           self.workload_run, lambda: self.save())
+        observer.stage("suspend", self.value.get("episode"), "WORKLOADS_RESTORE", "PASS")
+        observer.stage("suspend", self.value.get("episode"), "USBCLONE_RESTORE", "START")
         self.restore_clones()
+        observer.stage("suspend", self.value.get("episode"), "USBCLONE_RESTORE", "PASS")
         if self.r.lid_state() == 'closed' and not lid_ignored():
             self.failed('WAKE_WHILE_LID_CLOSED', 'healthy resume while lid remains closed; bounded retry required')
             raise rules.Refusal('lid remains closed after resume')
+        episode = self.value.get("episode")
+        started_at = self.value.get("resume_observer_started_at")
+        terminal_state = "COMPLETE" if self.value.get("actual_sleep") else "RECOVERED"
         with self.r.state_lock():
-            self.archive("COMPLETE" if self.value.get("actual_sleep") else "RECOVERED")
+            self.archive(terminal_state)
+        observer.success(
+            self.cfg, "suspend", episode,
+            started_at=started_at, terminal=terminal_state,
+        )
 
     def teardown(self):
         with self.r.state_lock():

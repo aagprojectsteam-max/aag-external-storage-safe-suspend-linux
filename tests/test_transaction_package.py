@@ -48,7 +48,7 @@ class TransactionPackageTests(unittest.TestCase):
             package.deploy.production, "Host", side_effect=AssertionError("host called")
         ):
             result = package.isolated(self.args)
-            self.assertEqual(result["files"], 15)
+            self.assertEqual(result["files"], len(package.deploy.mapping(self.config)) + 1)
             for source, logical in package.deploy.mapping(self.config).items():
                 installed = self.root / logical.relative_to("/")
                 self.assertEqual(installed.read_bytes(), source.read_bytes())

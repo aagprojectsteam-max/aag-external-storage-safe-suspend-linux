@@ -32,7 +32,7 @@ def mapping(config, locklock_patch=None):
     files[REPO / "src/reference-transaction-init.py"] = Path(
         "/usr/local/lib/aag-sleep-transaction/aag_safe_suspend/__init__.py"
     )
-    for name in ("production.py", "transaction.py", "workloads.py"):
+    for name in ("production.py", "transaction.py", "workloads.py", "resume_observer.py"):
         files[REPO / "src/aag_safe_suspend" / name] = (
             Path("/usr/local/lib/aag-sleep-transaction/aag_safe_suspend") / name
         )
