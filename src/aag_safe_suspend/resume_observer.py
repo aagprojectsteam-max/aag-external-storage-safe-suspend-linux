@@ -155,7 +155,54 @@ def success(config: dict, kind: str, episode, *, started_at=None, **detail):
     return path
 
 
-def failure(config: dict, kind: str, episode, *, phase: str, reason: str, started_at=None, **detail):
+def failed_items(value: dict, phase: str) -> list[str]:
+    """Return user-facing names only from durable restoration evidence."""
+    items: list[str] = []
+
+    for receipt in value.get("stopped_workloads", []) or []:
+        if receipt.get("restart_after_resume") != "if_was_running":
+            continue
+        if receipt.get("was_running") is not True:
+            continue
+        if receipt.get("status") not in {"RESTORED", "LEFT_STOPPED_BY_POLICY"}:
+            name = str(receipt.get("name") or "").strip()
+            if name:
+                items.append(name)
+
+    for receipt in value.get("usbclone_stopped", []) or []:
+        if receipt.get("was_running") is not True:
+            continue
+        if receipt.get("restart_after_resume") != "if_was_running":
+            continue
+        if receipt.get("status") != "RESTORED":
+            name = str(receipt.get("name") or "USB Clone")
+            profile = name.removeprefix("usbclone_")
+            items.append(f"USB Clone: {profile}" if profile else "USB Clone")
+
+    wwan = value.get("s4_wwan_receipt") or {}
+    if phase in {"S4_RESTORE", "WWAN_RESTORE"} and wwan.get("status") != "RESTORED":
+        items.append("מודם / WWAN")
+
+    phase_items = {
+        "RESTORE_STORAGE": "אחסון / DATA",
+        "DEVICE_POST": "שחזור התקני Suspend",
+        "DEVICE_POLICY_RESTORE": "מדיניות המודם",
+        "WAKE_WHILE_LID_CLOSED": "בדיקת מכסה",
+    }
+    if phase in phase_items:
+        items.append(phase_items[phase])
+
+    # Stable de-duplication; never invent process/application names.
+    seen = set()
+    result = []
+    for item in items:
+        if item and item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+
+def failure(config: dict, kind: str, episode, *, phase: str, reason: str, started_at=None, failed_items=None, **detail):
     duration = None
     try:
         if started_at is not None:
@@ -164,10 +211,14 @@ def failure(config: dict, kind: str, episode, *, phase: str, reason: str, starte
         duration = None
     label = _label(kind)
     title = f"AAG — בעיה בשחזור מ{label}"
-    body = (
-        f"תהליך השחזור לא הושלם בשלב {phase}. "
-        f"פרטי התקלה נשמרו ב־{LOG_DIR}."
-    )
+    failed_items = list(failed_items or [])
+    body = f"תהליך השחזור לא הושלם בשלב {phase}."
+    if failed_items:
+        visible = ", ".join(failed_items[:4])
+        if len(failed_items) > 4:
+            visible += f" ועוד {len(failed_items) - 4}"
+        body += f" לא שוחזרו: {visible}."
+    body += f" פרטי התקלה נשמרו ב־{LOG_DIR}."
     sent = _notify(config, title, body, urgency="critical")
     path = _append(
         kind,
@@ -178,6 +229,7 @@ def failure(config: dict, kind: str, episode, *, phase: str, reason: str, starte
         reason=str(reason)[:4000],
         duration_seconds=duration,
         notification_sent=sent,
+        failed_items=failed_items,
         **detail,
     )
     prune()

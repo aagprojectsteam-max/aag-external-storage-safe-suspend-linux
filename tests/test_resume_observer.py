@@ -69,6 +69,37 @@ class ResumeObserverTests(unittest.TestCase):
         self.assertIn("כותרת", argv)
         self.assertIn("תוכן", argv)
 
+    def test_failed_items_name_only_real_unrestored_components(self):
+        value = {
+            "stopped_workloads": [
+                {"name": "AnythingLLM", "was_running": True, "restart_after_resume": "if_was_running", "status": "RESTORE_REQUESTED"},
+                {"name": "Never", "was_running": True, "restart_after_resume": "never", "status": "LEFT_STOPPED_BY_POLICY"},
+                {"name": "Healthy", "was_running": True, "restart_after_resume": "if_was_running", "status": "RESTORED"},
+            ],
+            "usbclone_stopped": [
+                {"name": "usbclone_kingston", "was_running": True, "restart_after_resume": "if_was_running", "status": "RESTORE_FAILED"},
+            ],
+            "s4_wwan_receipt": {"status": "RESTORE_FAILED"},
+        }
+        self.assertEqual(
+            observer.failed_items(value, "S4_RESTORE"),
+            ["AnythingLLM", "USB Clone: kingston", "מודם / WWAN"],
+        )
+
+    def test_failure_notification_includes_failed_component_names(self):
+        cfg = {}
+        with patch.object(observer, "_notify", return_value=True) as notify:
+            observer.failure(
+                cfg, "hibernate", "episode",
+                phase="S4_RESTORE", reason="timeout",
+                failed_items=["AnythingLLM", "USB Clone: kingston"],
+            )
+        body = notify.call_args.args[2]
+        self.assertIn("AnythingLLM", body)
+        self.assertIn("USB Clone: kingston", body)
+        row = self.rows("hibernate")[0]
+        self.assertEqual(row["failed_items"], ["AnythingLLM", "USB Clone: kingston"])
+
     def test_logging_failure_is_best_effort(self):
         impossible = Path(self.tmp.name) / "not-a-directory"
         impossible.write_text("x")

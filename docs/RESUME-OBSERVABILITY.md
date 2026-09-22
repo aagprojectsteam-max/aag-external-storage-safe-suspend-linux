@@ -47,7 +47,11 @@ RESUME_FAILED
 
 Stage events record START/PASS transitions for storage, USB Clone, WWAN,
 consumers and device verification as applicable. Terminal events include total
-restore duration. Failure events include the failing phase and reason.
+restore duration. Failure events include the failing phase, reason and, when
+durable receipts identify them, the exact workloads/components that did not
+return (for example a named workload, a USB Clone profile, WWAN or DATA).
+The desktop failure notification includes up to four of those names; the JSONL
+record keeps the complete list.
 
 The system journal remains the authoritative low-level record; these JSONL logs
 are a concise restoration timeline for diagnosis.

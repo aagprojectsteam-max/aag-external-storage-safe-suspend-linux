@@ -228,6 +228,7 @@ class Host:
             observer.failure(
                 self.cfg, resume_kind, self.value.get("episode"),
                 phase=stage, reason=reason, started_at=started_at,
+                failed_items=observer.failed_items(self.value, stage),
             )
 
     def archive(self, terminal):
