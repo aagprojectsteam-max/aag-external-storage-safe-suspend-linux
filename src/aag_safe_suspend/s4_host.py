@@ -9,10 +9,10 @@ import time
 import uuid
 
 from . import production as p
+from . import resume_observer as observer
 from . import s4_checks as checks
 from . import s4_transaction as s4
 from . import transaction as tx
-from . import resume_observer as observer
 from .transaction import Refusal
 
 NATIVE = "systemd-hibernate.service"
